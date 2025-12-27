@@ -1,0 +1,225 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+local KILLAURA_ENABLED = false
+local RANGE = 40
+local ATTACK_DELAY = 0.15
+
+local lastAttackTime = 0
+local WEAPON_NAME = "Axe"
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 280, 0, 180)
+Frame.Position = UDim2.new(0.05, 0, 0.25, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 12)
+Corner.Parent = Frame
+
+local dragging = false
+local dragStart, startPos
+
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = Frame.Position
+    end
+end)
+
+Frame.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 45)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Title.Text = "G&B Killaura"
+Title.TextColor3 = Color3.fromRGB(255, 170, 0)
+Title.TextSize = 24
+Title.Font = Enum.Font.GothamBold
+Title.Parent = Frame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 12)
+TitleCorner.Parent = Title
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0.88, 0, 0, 60)
+ToggleBtn.Position = UDim2.new(0.06, 0, 0.28, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+ToggleBtn.Text = "Auto Attack\nOFF"
+ToggleBtn.TextColor3 = Color3.new(1,1,1)
+ToggleBtn.TextSize = 22
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.Parent = Frame
+
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(0, 10)
+BtnCorner.Parent = ToggleBtn
+
+local WeaponBtn = Instance.new("TextButton")
+WeaponBtn.Size = UDim2.new(0.88, 0, 0, 30)
+WeaponBtn.Position = UDim2.new(0.06, 0, 0.62, 0)
+WeaponBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+WeaponBtn.Text = "Weapon: " .. WEAPON_NAME
+WeaponBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+WeaponBtn.TextSize = 16
+WeaponBtn.Font = Enum.Font.Gotham
+WeaponBtn.Parent = Frame
+
+local WeaponCorner = Instance.new("UICorner")
+WeaponCorner.CornerRadius = UDim.new(0, 8)
+WeaponCorner.Parent = WeaponBtn
+
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(0.88, 0, 0, 32)
+StatusLabel.Position = UDim2.new(0.06, 0, 0.8, 0)
+StatusLabel.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+StatusLabel.Text = "Waiting..."
+StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 120)
+StatusLabel.TextSize = 15
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.Parent = Frame
+
+local StatusCorner = Instance.new("UICorner")
+StatusCorner.CornerRadius = UDim.new(0, 8)
+StatusCorner.Parent = StatusLabel
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    KILLAURA_ENABLED = not KILLAURA_ENABLED
+    ToggleBtn.Text = "Auto Attack\n" .. (KILLAURA_ENABLED and "ON" or "OFF")
+    ToggleBtn.BackgroundColor3 = KILLAURA_ENABLED and Color3.fromRGB(60, 220, 60) or Color3.fromRGB(220, 60, 60)
+    StatusLabel.Text = KILLAURA_ENABLED and "Running..." or "Stopped"
+end)
+
+local weapons = {"Axe", "Heavy Sabre", "Sabre", "Bayonet"}
+local weaponIndex = 1
+WeaponBtn.MouseButton1Click:Connect(function()
+    weaponIndex = weaponIndex % #weapons + 1
+    WEAPON_NAME = weapons[weaponIndex]
+    WeaponBtn.Text = "Weapon: " .. WEAPON_NAME
+end)
+
+local function getRemote()
+    local playerFolder = workspace.Players:FindFirstChild(LocalPlayer.Name)
+    if not playerFolder then return nil end
+    local weapon = playerFolder:FindFirstChild(WEAPON_NAME)
+    if weapon then
+        return weapon:FindFirstChild("RemoteEvent")
+    end
+    return nil
+end
+
+local function equipWeapon()
+    local weapon = LocalPlayer.Backpack:FindFirstChild(WEAPON_NAME)
+    if weapon and LocalPlayer.Character then
+        LocalPlayer.Character.Humanoid:EquipTool(weapon)
+        task.wait(0.15)
+        return true
+    end
+    return false
+end
+
+local function findNearestZombie()
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+    local myPos = char.HumanoidRootPart.Position
+    local zombiesFolder = workspace:FindFirstChild("Zombies")
+    if not zombiesFolder then return nil end
+    local closest = nil
+    local closestDist = RANGE
+    for _, zombie in pairs(zombiesFolder:GetChildren()) do
+        if zombie:IsA("Model") then
+            local zHead = zombie:FindFirstChild("Head")
+            local zRoot = zombie:FindFirstChild("HumanoidRootPart") or zombie:FindFirstChild("Torso")
+            local zHum = zombie:FindFirstChildOfClass("Humanoid")
+            if zRoot and zHum and zHum.Health > 0 and zHead then
+                local dist = (myPos - zRoot.Position).Magnitude
+                if dist < closestDist then
+                    closest = zombie
+                    closestDist = dist
+                end
+            end
+        end
+    end
+    if closest then
+        return {
+            model = closest,
+            root = closest:FindFirstChild("HumanoidRootPart") or closest:FindFirstChild("Torso"),
+            head = closest:FindFirstChild("Head"),
+            distance = closestDist
+        }
+    end
+    return nil
+end
+
+local function attackZombie(zombie)
+    local now = tick()
+    if now - lastAttackTime < ATTACK_DELAY then return false end
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local charWeapon = char:FindFirstChild(WEAPON_NAME)
+    if not charWeapon then equipWeapon() end
+    local remote = getRemote()
+    if not remote then
+        StatusLabel.Text = "Remote Error"
+        return false
+    end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    local direction = (zombie.root.Position - hrp.Position).Unit
+    local velocity = direction * 12
+    local success = pcall(function()
+        remote:FireServer("Swing", "Side")
+        remote:FireServer("HitZombie", zombie.model, zombie.head.Position, true, velocity, "Head", direction)
+    end)
+    if success then
+        lastAttackTime = now
+        StatusLabel.Text = "Hit: " .. math.floor(zombie.distance) .. "m"
+        return true
+    else
+        StatusLabel.Text = "Attack Failed"
+    end
+    return false
+end
+
+RunService.Heartbeat:Connect(function()
+    if not KILLAURA_ENABLED then return end
+    local zombie = findNearestZombie()
+    if zombie then
+        attackZombie(zombie)
+    else
+        if tick() % 3 < 0.1 then
+            StatusLabel.Text = "Scanning..."
+        end
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    KILLAURA_ENABLED = false
+    ToggleBtn.Text = "Auto Attack\nOFF"
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+    StatusLabel.Text = "Reset - Restart"
+end)
+
+print("Success: G&B Killaura Loaded")
