@@ -1,0 +1,121 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+local FLYING = false
+local FLY_SPEED = 35 
+local ANIM_ID = "rbxassetid://12333488486"
+local CAMERA = workspace.CurrentCamera
+local flyAnimTrack = nil
+
+-- --- UI 构建 ---
+local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0, 200, 0, 110)
+Frame.Position = UDim2.new(0.5, -100, 0.8, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+Frame.BorderSizePixel = 0
+Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 8)
+
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.Text = "Silent Fly V5 (Combat)"
+Title.TextColor3 = Color3.fromRGB(255, 200, 0)
+Title.TextSize = 16
+Title.Font = Enum.Font.GothamBold
+Title.BackgroundTransparency = 1
+
+local ToggleBtn = Instance.new("TextButton", Frame)
+ToggleBtn.Size = UDim2.new(0.85, 0, 0, 40)
+ToggleBtn.Position = UDim2.new(0.075, 0, 0.45, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+ToggleBtn.Text = "静默飞行: 关"
+ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
+ToggleBtn.TextSize = 16
+ToggleBtn.Font = Enum.Font.GothamBold
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
+
+-- 拖动
+local dragging, dragStart, startPos
+Frame.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging = true dragStart = i.Position startPos = Frame.Position end end)
+UIS.InputChanged:Connect(function(i) if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then local delta = i.Position - dragStart Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
+UIS.InputEnded:Connect(function() dragging = false end)
+
+-- ================= 核心：动画逻辑（战斗兼容） =================
+
+local function handleAnimation()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+
+    if FLYING then
+        if not flyAnimTrack then
+            local anim = Instance.new("Animation")
+            anim.AnimationId = ANIM_ID
+            flyAnimTrack = hum:LoadAnimation(anim)
+            -- 重点：使用 Core 或 Idle 优先级，让攻击动画(Action)可以覆盖它
+            flyAnimTrack.Priority = Enum.AnimationPriority.Core
+            flyAnimTrack.Looped = true
+        end
+        flyAnimTrack:Play(0.5)
+    else
+        if flyAnimTrack then flyAnimTrack:Stop(0.5) end
+    end
+end
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    FLYING = not FLYING
+    ToggleBtn.Text = FLYING and "静默飞行: 开" or "静默飞行: 关"
+    ToggleBtn.BackgroundColor3 = FLYING and Color3.fromRGB(40, 180, 40) or Color3.fromRGB(180, 40, 40)
+    
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, not FLYING)
+        hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, not FLYING)
+        handleAnimation()
+        if not FLYING then hum:ChangeState(Enum.HumanoidStateType.GettingUp) end
+    end
+end)
+
+-- --- 核心 Bypass & 位移 & 攻击检测 ---
+RunService.PreSimulation:Connect(function(dt)
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    
+    if FLYING and hrp and hum then
+        -- 1. 核心 Bypass
+        hum:ChangeState(Enum.HumanoidStateType.Climbing)
+        
+        -- 2. 静默拦截：只停止原生爬梯动画，不影响其他动作
+        for _, track in pairs(hum:GetPlayingAnimationTracks()) do
+            local name = track.Name:lower()
+            local id = track.Animation.AnimationId
+            if (name:find("climb") or id:find("climb")) and track ~= flyAnimTrack then
+                track:Stop(0)
+            end
+        end
+
+        -- 3. 飞行控制
+        local moveDir = Vector3.new(0, 0, 0)
+        local camCF = CAMERA.CFrame
+        if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + camCF.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - camCF.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - camCF.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camCF.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0, 1, 0) end
+        
+        if moveDir.Magnitude > 0 then
+            local nextPos = hrp.Position + (moveDir.Unit * FLY_SPEED * dt)
+            hrp.CFrame = CFrame.new(nextPos, nextPos + camCF.LookVector)
+        end
+        
+        -- 4. 速度伪装
+        hrp.Velocity = Vector3.new(0, 0.07, 0)
+    end
+end)
