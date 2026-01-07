@@ -1,0 +1,106 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
+
+-- --- 配置参数 ---
+local PlatformSize = Vector3.new(6, 0.5, 6)
+local VerticalSpeed = 0.7 
+local IsActive = false
+local MoveState = 0 
+
+-- --- 创建 UI 界面 (小型化 45x45) ---
+local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+ScreenGui.Name = "MiniClimbGui"
+
+-- 通用拖动函数
+local function makeDraggable(obj)
+    local dragging, dragStart, startPos
+    obj.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = obj.Position
+        end
+    end)
+    obj.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+            local delta = input.Position - dragStart
+            obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    obj.InputEnded:Connect(function() dragging = false end)
+end
+
+-- 创建按钮函数
+local function createSmallBtn(text, pos, color)
+    local btn = Instance.new("TextButton", ScreenGui)
+    btn.Size = UDim2.new(0, 45, 0, 45)
+    btn.Position = pos
+    btn.Text = text
+    btn.BackgroundColor3 = color
+    btn.BackgroundTransparency = 0.3 -- UI半透明
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 12
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+    makeDraggable(btn)
+    return btn
+end
+
+local MainBtn = createSmallBtn("平台:关", UDim2.new(0.05, 0, 0.4, 0), Color3.fromRGB(40, 40, 40))
+local UpBtn = createSmallBtn("↑", UDim2.new(0.9, 0, 0.4, 0), Color3.fromRGB(60, 60, 60))
+local DownBtn = createSmallBtn("↓", UDim2.new(0.9, 0, 0.48, 0), Color3.fromRGB(60, 60, 60))
+UpBtn.Visible, DownBtn.Visible = false, false
+
+-- --- 创建物理平台 (完全透明) ---
+local Platform = Instance.new("Part")
+Platform.Size = PlatformSize
+Platform.Transparency = 1 -- 1 为完全透明
+Platform.Anchored = true
+Platform.CanCollide = true
+Platform.Parent = nil
+
+-- --- 逻辑处理 ---
+UpBtn.MouseButton1Down:Connect(function() MoveState = 1 end)
+UpBtn.MouseButton1Up:Connect(function() MoveState = 0 end)
+DownBtn.MouseButton1Down:Connect(function() MoveState = -1 end)
+DownBtn.MouseButton1Up:Connect(function() MoveState = 0 end)
+
+MainBtn.MouseButton1Click:Connect(function()
+    IsActive = not IsActive
+    local char = LP.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+    if IsActive then
+        MainBtn.Text = "爬行中"
+        MainBtn.BackgroundColor3 = Color3.fromRGB(255, 85, 0)
+        UpBtn.Visible, DownBtn.Visible = true, true
+        Platform.Parent = workspace
+        if hrp then Platform.CFrame = hrp.CFrame * CFrame.new(0, -3.5, 0) end
+    else
+        MainBtn.Text = "平台:关"
+        MainBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        UpBtn.Visible, DownBtn.Visible = false, false
+        Platform.Parent = nil
+        if hum then hum:ChangeState(Enum.HumanoidStateType.FallingDown) end
+    end
+end)
+
+-- --- 核心循环 ---
+RunService.PreRender:Connect(function()
+    if IsActive and LP.Character then
+        local hrp = LP.Character:FindFirstChild("HumanoidRootPart")
+        local hum = LP.Character:FindFirstChildOfClass("Humanoid")
+        
+        if hrp and hum then
+            hum:ChangeState(Enum.HumanoidStateType.Climbing)
+            local currentPos = Platform.Position
+            local targetY = currentPos.Y + (MoveState * VerticalSpeed)
+            Platform.CFrame = CFrame.new(hrp.Position.X, targetY, hrp.Position.Z)
+            hrp.CFrame = CFrame.new(hrp.Position.X, targetY + 3.3, hrp.Position.Z) * (hrp.CFrame - hrp.Position)
+            hrp.Velocity = Vector3.new(0,0,0)
+        end
+    end
+end)
