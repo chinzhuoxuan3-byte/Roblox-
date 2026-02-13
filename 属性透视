@@ -1,0 +1,292 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+local TweenService = game:GetService("TweenService")
+local Camera = workspace.CurrentCamera
+
+local FISH_PATH = workspace:WaitForChild("Game"):WaitForChild("Fish"):WaitForChild("client")
+local CONFIG_FILE = "FishESP_Config.json"
+
+local MUTATIONS = {
+    "Poop", "Rock", "Moss", "Coral", "Albino", "Metal", "Sand", 
+    "Transparent", "Cactus", "Spirit", "Fossil", "Golden", 
+    "Negative", "Fairy", "Invisible", "Neon", "Ultraviolet", 
+    "Rooted", "Shadow", "Angelic", "Abyssal"
+}
+
+local SavedNames = {}
+if isfile(CONFIG_FILE) then
+    pcall(function()
+        local data = HttpService:JSONDecode(readfile(CONFIG_FILE))
+        if type(data) == "table" then
+            SavedNames = data
+        end
+    end)
+end
+
+local function SaveConfig()
+    writefile(CONFIG_FILE, HttpService:JSONEncode(SavedNames))
+end
+
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "FishESP_Renamer"
+Gui.ResetOnSpawn = false
+Gui.Parent = PlayerGui
+
+local Panel = Instance.new("Frame")
+Panel.Size = UDim2.new(0, 220, 0, 250) 
+Panel.Position = UDim2.new(0.5, -110, 0.5, -125)
+Panel.BackgroundColor3 = Color3.fromRGB(20, 25, 30)
+Panel.BorderSizePixel = 0
+Panel.ClipsDescendants = true
+Panel.Parent = Gui
+Instance.new("UICorner", Panel).CornerRadius = UDim.new(0, 8)
+
+local TitleButton = Instance.new("TextButton")
+TitleButton.Size = UDim2.new(1, 0, 0, 30)
+TitleButton.BackgroundTransparency = 1
+TitleButton.Font = Enum.Font.Arcade
+TitleButton.TextSize = 14
+TitleButton.Text = "Fish ESP (Mutation Support)"
+TitleButton.TextColor3 = Color3.new(1, 1, 1)
+TitleButton.Parent = Panel
+
+local dragToggle, dragStart, startPos
+TitleButton.InputBegan:Connect(function(input)
+    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        dragToggle = true
+        dragStart = input.Position
+        startPos = Panel.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragToggle = false
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        Panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+local isCollapsed = false
+TitleButton.MouseButton1Click:Connect(function()
+    isCollapsed = not isCollapsed
+    local h = isCollapsed and 30 or 250
+    TweenService:Create(Panel, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 220, 0, h)}):Play()
+end)
+
+local Scroll = Instance.new("ScrollingFrame")
+Scroll.Size = UDim2.new(1, -10, 1, -40)
+Scroll.Position = UDim2.new(0, 5, 0, 35)
+Scroll.BackgroundTransparency = 1
+Scroll.BorderSizePixel = 0
+Scroll.ScrollBarThickness = 3
+Scroll.Parent = Panel
+local UIList = Instance.new("UIListLayout")
+UIList.Parent = Scroll
+UIList.Padding = UDim.new(0, 5)
+UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+UIList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() Scroll.CanvasSize = UDim2.new(0, 0, 0, UIList.AbsoluteContentSize.Y) end)
+
+local Groups = {} 
+local ActiveESP = {}
+
+local function getMutation(model)
+    local targetName = string.lower(model.Name)
+    for _, mut in ipairs(MUTATIONS) do
+        if string.find(targetName, string.lower(mut)) then
+            return mut
+        end
+    end
+    return nil
+end
+
+local function getDisplayName(mut)
+    return SavedNames[mut] or mut
+end
+
+local function getColor(mut)
+    local sum = 0
+    for i = 1, #mut do sum = sum + string.byte(mut, i) end
+    return Color3.fromHSV((sum % 255) / 255, 0.8, 1)
+end
+
+local function updateESPText(model, text)
+    if ActiveESP[model] and ActiveESP[model][2] then
+        local lbl = ActiveESP[model][2]:FindFirstChild("TextLabel")
+        if lbl then 
+            local distStr = string.match(lbl.Text, "%[.*%]") or ""
+            lbl.Text = text .. "\n" .. distStr
+        end
+    end
+end
+
+local function updateUI(mut)
+    local data = Groups[mut]
+    if not data then return end
+    local count = 0
+    for _ in pairs(data.Objects) do count = count + 1 end
+    local name = getDisplayName(mut)
+    data.Button.Text = string.format("%s (x%d)", name, count)
+    data.Button.BackgroundColor3 = data.Enabled and Color3.fromRGB(0, 100, 50) or Color3.fromRGB(40, 45, 50)
+    for m in pairs(data.Objects) do
+        updateESPText(m, name)
+    end
+end
+
+local function toggleESP(model, mut, state)
+    if state then
+        if ActiveESP[model] then return end
+        local color = getColor(mut)
+        local name = getDisplayName(mut)
+        local hl = Instance.new("Highlight")
+        hl.FillColor = color
+        hl.OutlineColor = Color3.new(1,1,1)
+        hl.FillTransparency = 0.5
+        hl.Adornee = model
+        hl.Parent = model
+        local bb = Instance.new("BillboardGui")
+        bb.Size = UDim2.new(0,120,0,50)
+        bb.AlwaysOnTop = true
+        bb.Adornee = model
+        bb.StudsOffset = Vector3.new(0,3,0)
+        local txt = Instance.new("TextLabel")
+        txt.Size = UDim2.new(1,0,1,0)
+        txt.BackgroundTransparency = 1
+        txt.Text = name
+        txt.TextColor3 = color
+        txt.TextStrokeTransparency = 0
+        txt.Font = Enum.Font.GothamBold
+        txt.TextSize = 14
+        txt.Parent = bb
+        bb.Parent = model
+        ActiveESP[model] = {hl, bb}
+    else
+        if ActiveESP[model] then
+            if ActiveESP[model][1] then ActiveESP[model][1]:Destroy() end
+            if ActiveESP[model][2] then ActiveESP[model][2]:Destroy() end
+            ActiveESP[model] = nil
+        end
+    end
+end
+
+for _, mut in ipairs(MUTATIONS) do
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(0.95, 0, 0, 25)
+    row.BackgroundTransparency = 1
+    row.Parent = Scroll
+    
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.65, -5, 1, 0)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 12
+    btn.TextColor3 = getColor(mut)
+    btn.Parent = row
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    
+    local input = Instance.new("TextBox")
+    input.Size = UDim2.new(0.35, 0, 1, 0)
+    input.Position = UDim2.new(0.65, 0, 0, 0)
+    input.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    input.TextColor3 = Color3.new(1,1,1)
+    input.PlaceholderText = "别名..."
+    input.Text = SavedNames[mut] or ""
+    input.Font = Enum.Font.SourceSans
+    input.TextSize = 11
+    input.Parent = row
+    Instance.new("UICorner", input).CornerRadius = UDim.new(0, 4)
+    
+    Groups[mut] = {
+        Objects = {},
+        Button = btn,
+        Input = input,
+        Enabled = false,
+        DefaultName = mut
+    }
+    
+    btn.MouseButton1Click:Connect(function()
+        local g = Groups[mut]
+        g.Enabled = not g.Enabled
+        updateUI(mut)
+        for m in pairs(g.Objects) do
+            toggleESP(m, mut, g.Enabled)
+        end
+    end)
+    
+    input.FocusLost:Connect(function()
+        if input.Text ~= "" then
+            SavedNames[mut] = input.Text
+        else
+            SavedNames[mut] = nil
+        end
+        SaveConfig()
+        updateUI(mut)
+    end)
+    
+    updateUI(mut)
+end
+
+local function onFishAdded(model)
+    local mut = getMutation(model)
+    if not mut or not Groups[mut] then return end
+    
+    Groups[mut].Objects[model] = true
+    updateUI(mut)
+    if Groups[mut].Enabled then
+        toggleESP(model, mut, true)
+    end
+end
+
+local function onFishRemoved(model)
+    for mut, data in pairs(Groups) do
+        if data.Objects[model] then
+            data.Objects[model] = nil
+            updateUI(mut)
+        end
+    end
+    if ActiveESP[model] then
+        if ActiveESP[model][1] then ActiveESP[model][1]:Destroy() end
+        if ActiveESP[model][2] then ActiveESP[model][2]:Destroy() end
+        ActiveESP[model] = nil
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    local camPos = Camera.CFrame.Position
+    for model, visuals in pairs(ActiveESP) do
+        if model.Parent and visuals[2].Enabled then
+            local pos = nil
+            if model:IsA("Model") and model.PrimaryPart then
+                pos = model.PrimaryPart.Position
+            elseif model:IsA("Model") then
+                pos = model:GetPivot().Position
+            elseif model:IsA("BasePart") then
+                pos = model.Position
+            else
+                local part = model:FindFirstChildWhichIsA("BasePart", true)
+                if part then pos = part.Position end
+            end
+            
+            if pos then
+                local dist = math.floor((pos - camPos).Magnitude)
+                local lbl = visuals[2]:FindFirstChild("TextLabel")
+                if lbl then
+                    local name = string.split(lbl.Text, "\n")[1]
+                    lbl.Text = string.format("%s\n[%dm]", name, dist)
+                end
+            end
+        end
+    end
+end)
+
+for _, c in ipairs(FISH_PATH:GetChildren()) do onFishAdded(c) end
+FISH_PATH.ChildAdded:Connect(function(c) task.wait(0.2); onFishAdded(c) end)
+FISH_PATH.ChildRemoved:Connect(onFishRemoved)
+
