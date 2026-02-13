@@ -1,0 +1,305 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+local Camera = workspace.CurrentCamera
+
+getgenv().AbyssMemoryESP = false
+getgenv().FishDatabase = {}
+getgenv().FilterFish = {}
+getgenv().FilterMutations = {}
+
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "小萱定制（外传死全家"
+Gui.ResetOnSpawn = false
+Gui.Parent = PlayerGui
+
+local Panel = Instance.new("Frame")
+Panel.Size = UDim2.new(0, 220, 0, 200) 
+Panel.Position = UDim2.new(0.5, -110, 0.5, -100)
+Panel.BackgroundColor3 = Color3.fromRGB(20, 25, 30)
+Panel.BorderSizePixel = 0
+Panel.ClipsDescendants = true
+Panel.Parent = Gui
+Instance.new("UICorner", Panel).CornerRadius = UDim.new(0, 8)
+
+local TitleButton = Instance.new("TextButton")
+TitleButton.Size = UDim2.new(1, 0, 0, 30)
+TitleButton.BackgroundTransparency = 1
+TitleButton.Font = Enum.Font.Arcade
+TitleButton.TextSize = 14
+TitleButton.Text = "Pro Filter ESP"
+TitleButton.TextColor3 = Color3.new(1, 1, 1)
+TitleButton.Parent = Panel
+
+local dragToggle, dragStart, startPos
+TitleButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragToggle = true
+        dragStart = input.Position
+        startPos = Panel.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragToggle = false end
+        end)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        Panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+local isCollapsed = false
+TitleButton.MouseButton1Click:Connect(function()
+    isCollapsed = not isCollapsed
+    local h = isCollapsed and 30 or 200
+    TweenService:Create(Panel, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 220, 0, h)}):Play()
+end)
+
+local Scroll = Instance.new("ScrollingFrame")
+Scroll.Size = UDim2.new(1, -10, 1, -40)
+Scroll.Position = UDim2.new(0, 5, 0, 35)
+Scroll.BackgroundTransparency = 1
+Scroll.BorderSizePixel = 0
+Scroll.ScrollBarThickness = 3
+Scroll.Parent = Panel
+local UIList = Instance.new("UIListLayout")
+UIList.Parent = Scroll
+UIList.Padding = UDim.new(0, 5)
+UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local function CreateToggle(name, varName)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 30)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 45, 50)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 14
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Text = name .. " [OFF]"
+    btn.Parent = Scroll
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+
+    btn.MouseButton1Click:Connect(function()
+        getgenv()[varName] = not getgenv()[varName]
+        btn.Text = name .. (getgenv()[varName] and " [ON]" or " [OFF]")
+        btn.BackgroundColor3 = getgenv()[varName] and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(40, 45, 50)
+    end)
+end
+
+local function ParseFilter(text)
+    local t = {}
+    for str in string.gmatch(text, "([^,]+)") do
+        local clean = str:gsub("^%s*(.-)%s*$", "%1")
+        if clean ~= "" then
+            table.insert(t, string.lower(clean))
+        end
+    end
+    return t
+end
+
+local function CreateInput(placeholder, isMut)
+    local input = Instance.new("TextBox")
+    input.Size = UDim2.new(0.9, 0, 0, 30)
+    input.BackgroundColor3 = Color3.fromRGB(30, 35, 40)
+    input.TextColor3 = Color3.new(1,1,1)
+    input.Font = Enum.Font.SourceSans
+    input.TextSize = 13
+    input.PlaceholderText = placeholder
+    input.Text = ""
+    input.Parent = Scroll
+    Instance.new("UICorner", input).CornerRadius = UDim.new(0, 4)
+
+    input.FocusLost:Connect(function()
+        if isMut then
+            getgenv().FilterMutations = ParseFilter(input.Text)
+        else
+            getgenv().FilterFish = ParseFilter(input.Text)
+        end
+    end)
+end
+
+CreateToggle("开启全量属性透视", "AbyssMemoryESP")
+CreateInput("过滤鱼种 (如: Shark,Tuna)", false)
+CreateInput("过滤特性 (如: Golden,Neon)", true)
+
+-- // 核心内存扫描 //
+task.spawn(function()
+    while task.wait(1.5) do
+        if getgenv().AbyssMemoryESP then
+            pcall(function()
+                local newDB = {}
+                for _, obj in pairs(getgc(true)) do
+                    if type(obj) == "table" then
+                        local model = rawget(obj, "model") or rawget(obj, "Model") or rawget(obj, "instance") or rawget(obj, "Instance")
+                        if typeof(model) == "Instance" and model:IsDescendantOf(workspace) then
+                            
+                            local dataTbl = rawget(obj, "boiddata") or rawget(obj, "data") or obj
+                            local fName = rawget(dataTbl, "name") or rawget(dataTbl, "Name")
+                            
+                            if type(fName) == "string" then
+                                local fVar = rawget(dataTbl, "variation") or rawget(dataTbl, "Variation")
+                                if type(fVar) ~= "string" then fVar = "" end
+                                
+                                local fMuts = rawget(dataTbl, "mutations") or rawget(dataTbl, "Mutations")
+                                local mutStr = ""
+                                if type(fMuts) == "table" then
+                                    local mutList = {}
+                                    for _, m in pairs(fMuts) do table.insert(mutList, tostring(m)) end
+                                    mutStr = table.concat(mutList, ", ")
+                                elseif type(fMuts) == "string" then
+                                    mutStr = fMuts
+                                end
+                                
+                                newDB[model] = {
+                                    Name = fName,
+                                    Variation = fVar,
+                                    Mutations = mutStr
+                                }
+                            end
+                        end
+                    end
+                end
+                getgenv().FishDatabase = newDB
+            end)
+        end
+    end
+end)
+
+local ActiveESP = {}
+
+local function UpdateESP(model, state)
+    if state then
+        if ActiveESP[model] then return end
+        
+        local bb = Instance.new("BillboardGui")
+        bb.Size = UDim2.new(0, 250, 0, 50)
+        bb.AlwaysOnTop = true
+        bb.Adornee = model
+        bb.StudsOffset = Vector3.new(0, 2, 0)
+        
+        local txt = Instance.new("TextLabel")
+        txt.Size = UDim2.new(1, 0, 1, 0)
+        txt.BackgroundTransparency = 1
+        txt.Text = "Scanning..."
+        txt.TextColor3 = Color3.fromRGB(255, 200, 50)
+        txt.TextStrokeTransparency = 0.5 -- 降低描边黑影的厚重感
+        txt.Font = Enum.Font.SourceSans -- 换成了细瘦的字体
+        txt.TextSize = 11 -- 字体变小
+        txt.Parent = bb
+        bb.Parent = model
+        
+        ActiveESP[model] = bb
+    else
+        if ActiveESP[model] then
+            ActiveESP[model]:Destroy()
+            ActiveESP[model] = nil
+        end
+    end
+end
+
+-- // 渲染与过滤循环 //
+RunService.RenderStepped:Connect(function()
+    local camPos = Camera.CFrame.Position
+    local isEnabled = getgenv().AbyssMemoryESP
+    
+    local fishFolder = workspace:FindFirstChild("Game")
+    if fishFolder then fishFolder = fishFolder:FindFirstChild("Fish") end
+    if fishFolder then fishFolder = fishFolder:FindFirstChild("client") end
+    
+    if fishFolder then
+        for _, fish in ipairs(fishFolder:GetChildren()) do
+            UpdateESP(fish, isEnabled)
+        end
+    end
+    
+    for model, bb in pairs(ActiveESP) do
+        if not model.Parent or not isEnabled then
+            bb:Destroy()
+            ActiveESP[model] = nil
+        else
+            local data = getgenv().FishDatabase[model]
+            if data then
+                -- 核心过滤逻辑
+                local passFish = true
+                if #getgenv().FilterFish > 0 then
+                    passFish = false
+                    local checkName = string.lower(data.Name)
+                    local checkVar = string.lower(data.Variation)
+                    for _, f in ipairs(getgenv().FilterFish) do
+                        if string.find(checkName, f) or string.find(checkVar, f) then
+                            passFish = true
+                            break
+                        end
+                    end
+                end
+
+                local passMut = true
+                if #getgenv().FilterMutations > 0 then
+                    passMut = false
+                    local checkMut = string.lower(data.Mutations)
+                    if checkMut ~= "" then
+                        for _, m in ipairs(getgenv().FilterMutations) do
+                            if string.find(checkMut, m) then
+                                passMut = true
+                                break
+                            end
+                        end
+                    end
+                end
+
+                if passFish and passMut then
+                    bb.Enabled = true
+                    local pos = nil
+                    pcall(function()
+                        if model:IsA("Model") then
+                            pos = model:GetPivot().Position
+                        elseif model:IsA("BasePart") then
+                            pos = model.Position
+                        end
+                    end)
+                    
+                    if pos then
+                        local dist = math.floor((pos - camPos).Magnitude)
+                        local txt = bb:FindFirstChild("TextLabel")
+                        if txt then
+                            local displayName = data.Name
+                            if data.Variation ~= "" then 
+                                displayName = data.Variation .. " " .. displayName 
+                            end
+                            
+                            local extraInfo = ""
+                            if data.Mutations ~= "" then
+                                extraInfo = "<" .. data.Mutations .. ">"
+                            end
+                            
+                            if extraInfo ~= "" then
+                                txt.Text = string.format("%s\n%s\n[%dm]", displayName, extraInfo, dist)
+                                txt.TextColor3 = Color3.fromRGB(255, 80, 255)
+                            elseif data.Variation ~= "" then
+                                txt.Text = string.format("%s\n[%dm]", displayName, dist)
+                                txt.TextColor3 = Color3.fromRGB(255, 200, 50)
+                            else
+                                txt.Text = string.format("%s\n[%dm]", displayName, dist)
+                                txt.TextColor3 = Color3.fromRGB(100, 255, 150)
+                            end
+                        end
+                    end
+                else
+                    bb.Enabled = false -- 隐藏不符合条件的鱼
+                end
+            else
+                -- 如果还在Scanning阶段且有过滤条件，先暂时隐藏防止满屏幕黄色
+                if #getgenv().FilterFish > 0 or #getgenv().FilterMutations > 0 then
+                    bb.Enabled = false
+                else
+                    bb.Enabled = true
+                    local txt = bb:FindFirstChild("TextLabel")
+                    if txt then txt.Text = "Scanning..." end
+                end
+            end
+        end
+    end
+end)
