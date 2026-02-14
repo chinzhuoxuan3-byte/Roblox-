@@ -1,0 +1,1601 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+local Camera = workspace.CurrentCamera
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+getgenv().AbyssMemoryESP = false
+getgenv().AbyssAutoMinigame = false
+getgenv().AbyssHitboxExpander = false
+getgenv().AbyssChestESP = false
+getgenv().AbyssAutoShake = false
+getgenv().AbyssAutoReel = false
+getgenv().AbyssInstantCatch = false
+getgenv().AbyssNPCESP = false
+getgenv().AbyssItemESP = false
+getgenv().AbyssFullbright = false
+getgenv().AbyssNoFog = false
+getgenv().AbyssAutoSell = false
+getgenv().AbyssAntiAFK = false
+getgenv().AbyssTeleportWaypoint = false
+getgenv().AbyssSpeedBoost = false
+getgenv().AbyssInfiniteOxygen = false
+getgenv().AbyssAutoCollectDaily = false
+getgenv().AbyssAutoEquipBestRod = false
+getgenv().AbyssAutoUseBait = false
+getgenv().AbyssAutoRepair = false
+getgenv().AbyssShowCoordinates = false
+getgenv().AbyssFishNotifier = false
+getgenv().AbyssRarityESP = false
+getgenv().AbyssAutoAcceptQuest = false
+getgenv().AbyssShowFishValue = false
+getgenv().AbyssAutocast = false
+getgenv().AbyssNoclip = false
+getgenv().AbyssWalkOnWater = false
+getgenv().AbyssAutoEvent = false
+getgenv().AbyssLocationESP = false
+getgenv().AbyssWeatherNotify = false
+getgenv().AbyssAutoCollectCrates = false
+getgenv().AbyssShowWeight = false
+getgenv().AbyssAntiDrown = false
+getgenv().AbyssAutoRefillBait = false
+getgenv().AbyssShowDepth = false
+getgenv().AbyssAutoCombo = false
+getgenv().AbyssInfiniteStamina = false
+getgenv().AbyssFasterReeling = false
+getgenv().AbyssAutoClaimRewards = false
+getgenv().AbyssShowPlayerStats = false
+getgenv().AbyssAutoJoinServer = false
+getgenv().AbyssCustomFOV = false
+getgenv().AbyssNoClip = false
+getgenv().AbyssJumpPower = false
+getgenv().AbyssFlyMode = false
+getgenv().AbyssESPDistance = false
+getgenv().AbyssAutoUseTotem = false
+getgenv().AbyssShowTime = false
+getgenv().AbyssAutoCraft = false
+getgenv().AbyssNoWaterDrag = false
+getgenv().AbyssInstantInteract = false
+getgenv().AbyssShowInventoryValue = false
+getgenv().AbyssAutoSort = false
+getgenv().AbyssRarityNotifier = false
+getgenv().AbyssTeleportToPlayer = false
+getgenv().AbyssAutoUpgrade = false
+getgenv().AbyssShowBestSpot = false
+getgenv().AbyssAutoOpenCrate = false
+getgenv().AbyssGodMode = false
+getgenv().AbyssRemoveWater = false
+getgenv().AbyssXRay = false
+getgenv().AbyssShowSpawnPoints = false
+getgenv().AbyssAutoCollectAll = false
+getgenv().AbyssFastInteract = false
+getgenv().AbyssItemDuplicator = false
+getgenv().AbyssInfiniteZoom = false
+getgenv().AbyssNoClipFishing = false
+getgenv().AbyssAutoLeaderboard = false
+
+getgenv().HitboxSize = 50
+getgenv().WalkSpeed = 16
+getgenv().JumpHeight = 50
+getgenv().FlySpeed = 50
+getgenv().FOVValue = 70
+getgenv().ESPMaxDistance = 1000
+getgenv().ReelSpeed = 1
+getgenv().MaxZoom = 500
+
+getgenv().FishDatabase = {}
+getgenv().ChestDatabase = {}
+getgenv().NPCDatabase = {}
+getgenv().ItemDatabase = {}
+getgenv().WaypointDatabase = {}
+getgenv().FilterFish = {}
+getgenv().FilterMutations = {}
+getgenv().FilterRarity = {}
+
+getgenv().StatisticsData = {
+    TotalFishCaught = 0,
+    TotalValueEarned = 0,
+    SessionStartTime = tick(),
+    RareCatches = 0,
+    LegendaryCatches = 0,
+    MythicCatches = 0,
+    TotalChestsOpened = 0,
+    TotalDistance = 0,
+    LastPosition = nil
+}
+
+local OriginalLightingSettings = {
+    Brightness = Lighting.Brightness,
+    ClockTime = Lighting.ClockTime,
+    FogEnd = Lighting.FogEnd,
+    FogStart = Lighting.FogStart,
+    GlobalShadows = Lighting.GlobalShadows,
+    OutdoorAmbient = Lighting.OutdoorAmbient,
+    Ambient = Lighting.Ambient
+}
+
+for _, module in ipairs(getloadedmodules()) do
+    pcall(function()
+        local req = require(module)
+        if type(req) == "table" and rawget(req, "UpdateUI") and rawget(req, "PerfectCatch") then
+            if not req._hooked then
+                local oldUpdateUI = req.UpdateUI
+                req.UpdateUI = function(self, dt)
+                    if getgenv().AbyssAutoMinigame and self._markerCurrent then
+                        self.zonePos = self._markerCurrent
+                    end
+                    return oldUpdateUI(self, dt)
+                end
+                req._hooked = true
+            end
+        end
+        if type(req) == "table" and rawget(req, "Shake") then
+            if not req._shakeHooked then
+                local oldShake = req.Shake
+                req.Shake = function(...)
+                    if getgenv().AbyssAutoShake then
+                        return true
+                    end
+                    return oldShake(...)
+                end
+                req._shakeHooked = true
+            end
+        end
+        if type(req) == "table" and rawget(req, "Reel") then
+            if not req._reelHooked then
+                local oldReel = req.Reel
+                req.Reel = function(...)
+                    if getgenv().AbyssAutoReel then
+                        return true
+                    end
+                    return oldReel(...)
+                end
+                req._reelHooked = true
+            end
+        end
+    end)
+end
+
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "AbyssAIO"
+Gui.ResetOnSpawn = false
+Gui.Parent = PlayerGui
+
+local Panel = Instance.new("Frame")
+Panel.Size = UDim2.new(0, 280, 0, 480)
+Panel.Position = UDim2.new(0.5, -140, 0.5, -240)
+Panel.BackgroundColor3 = Color3.fromRGB(20, 25, 30)
+Panel.BorderSizePixel = 0
+Panel.ClipsDescendants = true
+Panel.Parent = Gui
+Instance.new("UICorner", Panel).CornerRadius = UDim.new(0, 8)
+
+local Shadow = Instance.new("ImageLabel")
+Shadow.Name = "Shadow"
+Shadow.Parent = Panel
+Shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+Shadow.BackgroundTransparency = 1
+Shadow.Position = UDim2.new(0.5, 0, 0.5, 0)
+Shadow.Size = UDim2.new(1, 30, 1, 30)
+Shadow.ZIndex = 0
+Shadow.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
+Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+Shadow.ImageTransparency = 0.5
+Shadow.ScaleType = Enum.ScaleType.Slice
+Shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+
+local TitleButton = Instance.new("TextButton")
+TitleButton.Size = UDim2.new(1, 0, 0, 35)
+TitleButton.BackgroundColor3 = Color3.fromRGB(30, 35, 40)
+TitleButton.BorderSizePixel = 0
+TitleButton.Font = Enum.Font.GothamBold
+TitleButton.TextSize = 16
+TitleButton.Text = "⚡ Abyss AIO Pro v2.5"
+TitleButton.TextColor3 = Color3.fromRGB(100, 200, 255)
+TitleButton.Parent = Panel
+Instance.new("UICorner", TitleButton).CornerRadius = UDim.new(0, 8)
+
+local TitleGradient = Instance.new("UIGradient")
+TitleGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 45, 50)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 25, 30))
+}
+TitleGradient.Rotation = 90
+TitleGradient.Parent = TitleButton
+
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -35, 0, 2.5)
+CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseButton.BorderSizePixel = 0
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.TextSize = 18
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.new(1, 1, 1)
+CloseButton.Parent = TitleButton
+Instance.new("UICorner", CloseButton).CornerRadius = UDim.new(0, 6)
+
+CloseButton.MouseButton1Click:Connect(function()
+    Gui:Destroy()
+end)
+
+local dragToggle, dragStart, startPos
+TitleButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragToggle = true
+        dragStart = input.Position
+        startPos = Panel.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragToggle = false end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        Panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+local isCollapsed = false
+local MinimizeButton = Instance.new("TextButton")
+MinimizeButton.Size = UDim2.new(0, 30, 0, 30)
+MinimizeButton.Position = UDim2.new(1, -70, 0, 2.5)
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(100, 150, 200)
+MinimizeButton.BorderSizePixel = 0
+MinimizeButton.Font = Enum.Font.GothamBold
+MinimizeButton.TextSize = 18
+MinimizeButton.Text = "_"
+MinimizeButton.TextColor3 = Color3.new(1, 1, 1)
+MinimizeButton.Parent = TitleButton
+Instance.new("UICorner", MinimizeButton).CornerRadius = UDim.new(0, 6)
+
+MinimizeButton.MouseButton1Click:Connect(function()
+    isCollapsed = not isCollapsed
+    local h = isCollapsed and 35 or 480
+    TweenService:Create(Panel, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 280, 0, h)}):Play()
+    MinimizeButton.Text = isCollapsed and "+" or "_"
+end)
+
+local TabContainer = Instance.new("Frame")
+TabContainer.Size = UDim2.new(1, -10, 0, 35)
+TabContainer.Position = UDim2.new(0, 5, 0, 40)
+TabContainer.BackgroundTransparency = 1
+TabContainer.Parent = Panel
+
+local TabButtons = {}
+local TabContents = {}
+local CurrentTab = nil
+
+local function CreateTab(name, icon)
+    local tabBtn = Instance.new("TextButton")
+    tabBtn.Size = UDim2.new(0.24, 0, 1, 0)
+    tabBtn.Position = UDim2.new(0.25 * (#TabButtons), 0, 0, 0)
+    tabBtn.BackgroundColor3 = Color3.fromRGB(30, 35, 40)
+    tabBtn.BorderSizePixel = 0
+    tabBtn.Font = Enum.Font.GothamSemibold
+    tabBtn.TextSize = 11
+    tabBtn.Text = icon .. " " .. name
+    tabBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+    tabBtn.Parent = TabContainer
+    Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 6)
+    
+    local content = Instance.new("ScrollingFrame")
+    content.Size = UDim2.new(1, -10, 1, -85)
+    content.Position = UDim2.new(0, 5, 0, 80)
+    content.BackgroundTransparency = 1
+    content.BorderSizePixel = 0
+    content.ScrollBarThickness = 4
+    content.Visible = false
+    content.Parent = Panel
+    
+    local UIList = Instance.new("UIListLayout")
+    UIList.Parent = content
+    UIList.Padding = UDim.new(0, 5)
+    UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    UIList.SortOrder = Enum.SortOrder.LayoutOrder
+    
+    UIList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        content.CanvasSize = UDim2.new(0, 0, 0, UIList.AbsoluteContentSize.Y + 10)
+    end)
+    
+    tabBtn.MouseButton1Click:Connect(function()
+        for _, btn in pairs(TabButtons) do
+            btn.BackgroundColor3 = Color3.fromRGB(30, 35, 40)
+            btn.TextColor3 = Color3.fromRGB(150, 150, 150)
+        end
+        for _, cnt in pairs(TabContents) do
+            cnt.Visible = false
+        end
+        
+        tabBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 200)
+        tabBtn.TextColor3 = Color3.new(1, 1, 1)
+        content.Visible = true
+        CurrentTab = content
+    end)
+    
+    table.insert(TabButtons, tabBtn)
+    table.insert(TabContents, content)
+    
+    return content
+end
+
+local MainTab = CreateTab("主要", "🎣")
+local VisualTab = CreateTab("视觉", "👁")
+local PlayerTab = CreateTab("玩家", "🏃")
+local MiscTab = CreateTab("其他", "⚙")
+
+TabButtons[1]:Fire("MouseButton1Click")
+TabButtons[1].BackgroundColor3 = Color3.fromRGB(50, 120, 200)
+TabButtons[1].TextColor3 = Color3.new(1, 1, 1)
+MainTab.Visible = true
+
+local function CreateToggle(parent, name, varName, callback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(0.95, 0, 0, 35)
+    container.BackgroundColor3 = Color3.fromRGB(35, 40, 45)
+    container.BorderSizePixel = 0
+    container.Parent = parent
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 12
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Text = name
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+    
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0, 50, 0, 25)
+    toggle.Position = UDim2.new(1, -60, 0.5, -12.5)
+    toggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    toggle.BorderSizePixel = 0
+    toggle.Font = Enum.Font.GothamBold
+    toggle.TextSize = 10
+    toggle.Text = "OFF"
+    toggle.TextColor3 = Color3.new(1, 1, 1)
+    toggle.Parent = container
+    Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 6)
+    
+    toggle.MouseButton1Click:Connect(function()
+        getgenv()[varName] = not getgenv()[varName]
+        toggle.Text = getgenv()[varName] and "ON" or "OFF"
+        toggle.BackgroundColor3 = getgenv()[varName] and Color3.fromRGB(50, 200, 100) or Color3.fromRGB(200, 50, 50)
+        
+        if callback then
+            callback(getgenv()[varName])
+        end
+    end)
+    
+    return toggle
+end
+
+local function CreateSlider(parent, name, varName, min, max, increment, callback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(0.95, 0, 0, 50)
+    container.BackgroundColor3 = Color3.fromRGB(35, 40, 45)
+    container.BorderSizePixel = 0
+    container.Parent = parent
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -20, 0, 20)
+    label.Position = UDim2.new(0, 10, 0, 5)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 11
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Text = name .. ": " .. tostring(getgenv()[varName])
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+    
+    local sliderBack = Instance.new("Frame")
+    sliderBack.Size = UDim2.new(0.9, 0, 0, 6)
+    sliderBack.Position = UDim2.new(0.05, 0, 1, -15)
+    sliderBack.BackgroundColor3 = Color3.fromRGB(50, 55, 60)
+    sliderBack.BorderSizePixel = 0
+    sliderBack.Parent = container
+    Instance.new("UICorner", sliderBack).CornerRadius = UDim.new(0, 3)
+    
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new((getgenv()[varName] - min) / (max - min), 0, 1, 0)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(100, 200, 255)
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = sliderBack
+    Instance.new("UICorner", sliderFill).CornerRadius = UDim.new(0, 3)
+    
+    local sliderButton = Instance.new("TextButton")
+    sliderButton.Size = UDim2.new(0, 16, 0, 16)
+    sliderButton.Position = UDim2.new((getgenv()[varName] - min) / (max - min), -8, 0.5, -8)
+    sliderButton.BackgroundColor3 = Color3.new(1, 1, 1)
+    sliderButton.BorderSizePixel = 0
+    sliderButton.Text = ""
+    sliderButton.Parent = sliderBack
+    Instance.new("UICorner", sliderButton).CornerRadius = UDim.new(1, 0)
+    
+    local dragging = false
+    
+    sliderButton.MouseButton1Down:Connect(function()
+        dragging = true
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local pos = math.clamp((input.Position.X - sliderBack.AbsolutePosition.X) / sliderBack.AbsoluteSize.X, 0, 1)
+            local value = math.floor((min + (max - min) * pos) / increment + 0.5) * increment
+            getgenv()[varName] = value
+            
+            sliderFill.Size = UDim2.new(pos, 0, 1, 0)
+            sliderButton.Position = UDim2.new(pos, -8, 0.5, -8)
+            label.Text = name .. ": " .. tostring(value)
+            
+            if callback then
+                callback(value)
+            end
+        end
+    end)
+    
+    return container
+end
+
+local function CreateButton(parent, name, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.95, 0, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(50, 120, 200)
+    btn.BorderSizePixel = 0
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 12
+    btn.Text = name
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Parent = parent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    
+    btn.MouseButton1Click:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(100, 200, 255)
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 120, 200)}):Play()
+        if callback then
+            callback()
+        end
+    end)
+    
+    return btn
+end
+
+local function ParseFilter(text)
+    local t = {}
+    for str in string.gmatch(text, "([^,]+)") do
+        local clean = str:gsub("^%s*(.-)%s*$", "%1")
+        if clean ~= "" then table.insert(t, string.lower(clean)) end
+    end
+    return t
+end
+
+local function CreateInput(parent, placeholder, callback)
+    local input = Instance.new("TextBox")
+    input.Size = UDim2.new(0.95, 0, 0, 35)
+    input.BackgroundColor3 = Color3.fromRGB(30, 35, 40)
+    input.BorderSizePixel = 0
+    input.TextColor3 = Color3.new(1, 1, 1)
+    input.Font = Enum.Font.Gotham
+    input.TextSize = 11
+    input.PlaceholderText = placeholder
+    input.PlaceholderColor3 = Color3.fromRGB(120, 120, 120)
+    input.Text = ""
+    input.ClearTextOnFocus = false
+    input.Parent = parent
+    Instance.new("UICorner", input).CornerRadius = UDim.new(0, 6)
+    
+    input.FocusLost:Connect(function()
+        if callback then
+            callback(input.Text)
+        end
+    end)
+    
+    return input
+end
+
+local function CreateDropdown(parent, name, options, varName, callback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(0.95, 0, 0, 35)
+    container.BackgroundColor3 = Color3.fromRGB(35, 40, 45)
+    container.BorderSizePixel = 0
+    container.ClipsDescendants = false
+    container.Parent = parent
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.5, 0, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 11
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Text = name
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+    
+    local dropdown = Instance.new("TextButton")
+    dropdown.Size = UDim2.new(0.45, 0, 0, 30)
+    dropdown.Position = UDim2.new(0.53, 0, 0.5, -15)
+    dropdown.BackgroundColor3 = Color3.fromRGB(45, 50, 55)
+    dropdown.BorderSizePixel = 0
+    dropdown.Font = Enum.Font.Gotham
+    dropdown.TextSize = 10
+    dropdown.Text = getgenv()[varName] or options[1]
+    dropdown.TextColor3 = Color3.new(1, 1, 1)
+    dropdown.Parent = container
+    Instance.new("UICorner", dropdown).CornerRadius = UDim.new(0, 6)
+    
+    local expanded = false
+    local dropList = Instance.new("Frame")
+    dropList.Size = UDim2.new(1, 0, 0, #options * 25)
+    dropList.Position = UDim2.new(0, 0, 1, 5)
+    dropList.BackgroundColor3 = Color3.fromRGB(40, 45, 50)
+    dropList.BorderSizePixel = 0
+    dropList.Visible = false
+    dropList.ZIndex = 10
+    dropList.Parent = dropdown
+    Instance.new("UICorner", dropList).CornerRadius = UDim.new(0, 6)
+    
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Parent = dropList
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    
+    for i, opt in ipairs(options) do
+        local optBtn = Instance.new("TextButton")
+        optBtn.Size = UDim2.new(1, 0, 0, 25)
+        optBtn.BackgroundColor3 = i % 2 == 0 and Color3.fromRGB(45, 50, 55) or Color3.fromRGB(40, 45, 50)
+        optBtn.BorderSizePixel = 0
+        optBtn.Font = Enum.Font.Gotham
+        optBtn.TextSize = 10
+        optBtn.Text = opt
+        optBtn.TextColor3 = Color3.new(1, 1, 1)
+        optBtn.ZIndex = 10
+        optBtn.Parent = dropList
+        
+        optBtn.MouseButton1Click:Connect(function()
+            dropdown.Text = opt
+            getgenv()[varName] = opt
+            dropList.Visible = false
+            expanded = false
+            if callback then
+                callback(opt)
+            end
+        end)
+    end
+    
+    dropdown.MouseButton1Click:Connect(function()
+        expanded = not expanded
+        dropList.Visible = expanded
+    end)
+    
+    return container
+end
+
+local function CreateLabel(parent, text)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.95, 0, 0, 25)
+    label.BackgroundColor3 = Color3.fromRGB(25, 30, 35)
+    label.BorderSizePixel = 0
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 12
+    label.TextColor3 = Color3.fromRGB(100, 200, 255)
+    label.Text = text
+    label.Parent = parent
+    Instance.new("UICorner", label).CornerRadius = UDim.new(0, 6)
+    
+    return label
+end
+
+CreateLabel(MainTab, "🎣 钓鱼功能")
+CreateToggle(MainTab, "自动完美小游戏", "AbyssAutoMinigame")
+CreateToggle(MainTab, "自动甩竿", "AbyssAutoShake")
+CreateToggle(MainTab, "自动收线", "AbyssAutoReel")
+CreateToggle(MainTab, "瞬间钓鱼", "AbyssInstantCatch")
+CreateToggle(MainTab, "自动抛竿", "AbyssAutocast")
+CreateToggle(MainTab, "快速收线", "AbyssFasterReeling")
+CreateToggle(MainTab, "无限耐力", "AbyssInfiniteStamina")
+CreateToggle(MainTab, "自动使用鱼饵", "AbyssAutoUseBait")
+CreateToggle(MainTab, "自动补充鱼饵", "AbyssAutoRefillBait")
+CreateToggle(MainTab, "自动装备最佳鱼竿", "AbyssAutoEquipBestRod")
+CreateToggle(MainTab, "自动修理装备", "AbyssAutoRepair")
+CreateToggle(MainTab, "自动连击", "AbyssAutoCombo")
+CreateSlider(MainTab, "收线速度", "ReelSpeed", 1, 10, 0.5)
+
+CreateLabel(MainTab, "💰 自动化功能")
+CreateToggle(MainTab, "自动出售", "AbyssAutoSell")
+CreateToggle(MainTab, "自动收集箱子", "AbyssAutoCollectCrates")
+CreateToggle(MainTab, "自动开箱", "AbyssAutoOpenCrate")
+CreateToggle(MainTab, "自动收集每日奖励", "AbyssAutoCollectDaily")
+CreateToggle(MainTab, "自动接受任务", "AbyssAutoAcceptQuest")
+CreateToggle(MainTab, "自动领取奖励", "AbyssAutoClaimRewards")
+CreateToggle(MainTab, "自动收集全部", "AbyssAutoCollectAll")
+CreateToggle(MainTab, "自动制作", "AbyssCraft")
+CreateToggle(MainTab, "自动升级", "AbyssAutoUpgrade")
+CreateToggle(MainTab, "自动整理", "AbyssAutoSort")
+CreateToggle(MainTab, "自动使用图腾", "AbyssAutoUseTotem")
+CreateToggle(MainTab, "自动活动", "AbyssAutoEvent")
+
+CreateLabel(VisualTab, "👁 透视功能")
+CreateToggle(VisualTab, "鱼类透视", "AbyssMemoryESP")
+CreateToggle(VisualTab, "箱子透视", "AbyssChestESP")
+CreateToggle(VisualTab, "NPC透视", "AbyssNPCESP")
+CreateToggle(VisualTab, "物品透视", "AbyssItemESP")
+CreateToggle(VisualTab, "稀有度透视", "AbyssRarityESP")
+CreateToggle(VisualTab, "位置透视", "AbyssLocationESP")
+CreateToggle(VisualTab, "出生点透视", "AbyssShowSpawnPoints")
+CreateToggle(VisualTab, "最佳钓点显示", "AbyssShowBestSpot")
+CreateToggle(VisualTab, "碰撞箱扩大", "AbyssHitboxExpander")
+CreateSlider(VisualTab, "碰撞箱大小", "HitboxSize", 10, 200, 5)
+CreateSlider(VisualTab, "ESP最大距离", "ESPMaxDistance", 100, 5000, 100)
+
+CreateLabel(VisualTab, "🌈 环境设置")
+CreateToggle(VisualTab, "全亮", "AbyssFullbright", function(enabled)
+    if enabled then
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+        Lighting.FogEnd = 100000
+        Lighting.GlobalShadows = false
+        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        Lighting.Ambient = Color3.fromRGB(178, 178, 178)
+    else
+        Lighting.Brightness = OriginalLightingSettings.Brightness
+        Lighting.ClockTime = OriginalLightingSettings.ClockTime
+        Lighting.FogEnd = OriginalLightingSettings.FogEnd
+        Lighting.GlobalShadows = OriginalLightingSettings.GlobalShadows
+        Lighting.OutdoorAmbient = OriginalLightingSettings.OutdoorAmbient
+        Lighting.Ambient = OriginalLightingSettings.Ambient
+    end
+end)
+CreateToggle(VisualTab, "移除雾气", "AbyssNoFog", function(enabled)
+    if enabled then
+        Lighting.FogEnd = 100000
+        Lighting.FogStart = 0
+    else
+        Lighting.FogEnd = OriginalLightingSettings.FogEnd
+        Lighting.FogStart = OriginalLightingSettings.FogStart
+    end
+end)
+CreateToggle(VisualTab, "移除水面", "AbyssRemoveWater")
+CreateToggle(VisualTab, "X射线", "AbyssXRay")
+CreateToggle(VisualTab, "自定义FOV", "AbyssCustomFOV", function(enabled)
+    if enabled then
+        Camera.FieldOfView = getgenv().FOVValue
+    else
+        Camera.FieldOfView = 70
+    end
+end)
+CreateSlider(VisualTab, "FOV值", "FOVValue", 30, 120, 1, function(value)
+    if getgenv().AbyssCustomFOV then
+        Camera.FieldOfView = value
+    end
+end)
+CreateToggle(VisualTab, "无限缩放", "AbyssInfiniteZoom", function(enabled)
+    if enabled then
+        Player.CameraMaxZoomDistance = getgenv().MaxZoom
+    else
+        Player.CameraMaxZoomDistance = 128
+    end
+end)
+CreateSlider(VisualTab, "最大缩放", "MaxZoom", 100, 2000, 50, function(value)
+    if getgenv().AbyssInfiniteZoom then
+        Player.CameraMaxZoomDistance = value
+    end
+end)
+
+CreateLabel(VisualTab, "📊 显示信息")
+CreateToggle(VisualTab, "显示坐标", "AbyssShowCoordinates")
+CreateToggle(VisualTab, "显示深度", "AbyssShowDepth")
+CreateToggle(VisualTab, "显示重量", "AbyssShowWeight")
+CreateToggle(VisualTab, "显示时间", "AbyssShowTime")
+CreateToggle(VisualTab, "显示鱼价值", "AbyssShowFishValue")
+CreateToggle(VisualTab, "显示背包价值", "AbyssShowInventoryValue")
+CreateToggle(VisualTab, "显示玩家状态", "AbyssShowPlayerStats")
+CreateToggle(VisualTab, "鱼类通知", "AbyssFishNotifier")
+CreateToggle(VisualTab, "稀有度通知", "AbyssRarityNotifier")
+CreateToggle(VisualTab, "天气通知", "AbyssWeatherNotify")
+
+CreateLabel(PlayerTab, "🏃 移动功能")
+CreateToggle(PlayerTab, "速度提升", "AbyssSpeedBoost", function(enabled)
+    if Humanoid then
+        if enabled then
+            Humanoid.WalkSpeed = getgenv().WalkSpeed
+        else
+            Humanoid.WalkSpeed = 16
+        end
+    end
+end)
+CreateSlider(PlayerTab, "移动速度", "WalkSpeed", 16, 200, 2, function(value)
+    if getgenv().AbyssSpeedBoost and Humanoid then
+        Humanoid.WalkSpeed = value
+    end
+end)
+CreateToggle(PlayerTab, "跳跃提升", "AbyssJumpPower", function(enabled)
+    if Humanoid then
+        if enabled then
+            Humanoid.JumpPower = getgenv().JumpHeight
+        else
+            Humanoid.JumpPower = 50
+        end
+    end
+end)
+CreateSlider(PlayerTab, "跳跃高度", "JumpHeight", 50, 300, 10, function(value)
+    if getgenv().AbyssJumpPower and Humanoid then
+        Humanoid.JumpPower = value
+    end
+end)
+CreateToggle(PlayerTab, "飞行模式", "AbyssFlyMode")
+CreateSlider(PlayerTab, "飞行速度", "FlySpeed", 10, 200, 5)
+CreateToggle(PlayerTab, "穿墙模式", "AbyssNoclip")
+CreateToggle(PlayerTab, "水上行走", "AbyssWalkOnWater")
+CreateToggle(PlayerTab, "无水阻力", "AbyssNoWaterDrag")
+CreateToggle(PlayerTab, "上帝模式", "AbyssGodMode")
+
+CreateLabel(PlayerTab, "💧 生存功能")
+CreateToggle(PlayerTab, "无限氧气", "AbyssInfiniteOxygen")
+CreateToggle(PlayerTab, "防溺水", "AbyssAntiDrown")
+CreateToggle(PlayerTab, "防AFK", "AbyssAntiAFK")
+
+CreateLabel(PlayerTab, "📍 传送功能")
+CreateButton(PlayerTab, "传送到最近商店", function()
+    local shop = workspace:FindFirstChild("Shop", true)
+    if shop and HumanoidRootPart then
+        HumanoidRootPart.CFrame = shop.CFrame + Vector3.new(0, 3, 0)
+    end
+end)
+CreateButton(PlayerTab, "传送到最佳钓点", function()
+    if HumanoidRootPart then
+        HumanoidRootPart.CFrame = CFrame.new(0, 50, 0)
+    end
+end)
+CreateButton(PlayerTab, "传送到出生点", function()
+    if HumanoidRootPart then
+        HumanoidRootPart.CFrame = CFrame.new(0, 10, 0)
+    end
+end)
+CreateToggle(PlayerTab, "传送到玩家", "AbyssTeleportToPlayer")
+CreateToggle(PlayerTab, "传送到航点", "AbyssTeleportWaypoint")
+
+CreateLabel(MiscTab, "🔧 过滤设置")
+CreateInput(MiscTab, "过滤鱼种 (如: Shark,Tuna)", function(text)
+    getgenv().FilterFish = ParseFilter(text)
+end)
+CreateInput(MiscTab, "过滤特性 (如: Golden,Neon)", function(text)
+    getgenv().FilterMutations = ParseFilter(text)
+end)
+CreateInput(MiscTab, "过滤稀有度 (如: Legendary,Mythic)", function(text)
+    getgenv().FilterRarity = ParseFilter(text)
+end)
+
+CreateLabel(MiscTab, "⚡ 快捷功能")
+CreateToggle(MiscTab, "快速交互", "AbyssFastInteract")
+CreateToggle(MiscTab, "瞬间交互", "AbyssInstantInteract")
+CreateToggle(MiscTab, "无夹子钓鱼", "AbyssNoClipFishing")
+CreateToggle(MiscTab, "自动排行榜", "AbyssAutoLeaderboard")
+CreateToggle(MiscTab, "自动服务器", "AbyssAutoJoinServer")
+
+CreateLabel(MiscTab, "📈 统计信息")
+CreateButton(MiscTab, "查看统计", function()
+    local sessionTime = math.floor(tick() - getgenv().StatisticsData.SessionStartTime)
+    local hours = math.floor(sessionTime / 3600)
+    local minutes = math.floor((sessionTime % 3600) / 60)
+    local seconds = sessionTime % 60
+    
+    local statsText = string.format(
+        "游戏时间: %dh %dm %ds\n总钓鱼: %d\n总价值: $%d\n稀有: %d | 传说: %d | 神话: %d\n宝箱: %d\n移动距离: %.1fm",
+        hours, minutes, seconds,
+        getgenv().StatisticsData.TotalFishCaught,
+        getgenv().StatisticsData.TotalValueEarned,
+        getgenv().StatisticsData.RareCatches,
+        getgenv().StatisticsData.LegendaryCatches,
+        getgenv().StatisticsData.MythicCatches,
+        getgenv().StatisticsData.TotalChestsOpened,
+        getgenv().StatisticsData.TotalDistance
+    )
+    
+    local notification = Instance.new("ScreenGui")
+    notification.Parent = CoreGui
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 300, 0, 180)
+    frame.Position = UDim2.new(0.5, -150, 0.5, -90)
+    frame.BackgroundColor3 = Color3.fromRGB(20, 25, 30)
+    frame.BorderSizePixel = 0
+    frame.Parent = notification
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+    
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 30)
+    title.BackgroundColor3 = Color3.fromRGB(50, 120, 200)
+    title.BorderSizePixel = 0
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 14
+    title.Text = "📊 游戏统计"
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.Parent = frame
+    Instance.new("UICorner", title).CornerRadius = UDim.new(0, 8)
+    
+    local stats = Instance.new("TextLabel")
+    stats.Size = UDim2.new(1, -20, 1, -40)
+    stats.Position = UDim2.new(0, 10, 0, 35)
+    stats.BackgroundTransparency = 1
+    stats.Font = Enum.Font.Gotham
+    stats.TextSize = 12
+    stats.Text = statsText
+    stats.TextColor3 = Color3.new(1, 1, 1)
+    stats.TextXAlignment = Enum.TextXAlignment.Left
+    stats.TextYAlignment = Enum.TextYAlignment.Top
+    stats.Parent = frame
+    
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 80, 0, 30)
+    closeBtn.Position = UDim2.new(0.5, -40, 1, -40)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    closeBtn.BorderSizePixel = 0
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 12
+    closeBtn.Text = "关闭"
+    closeBtn.TextColor3 = Color3.new(1, 1, 1)
+    closeBtn.Parent = frame
+    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+    
+    closeBtn.MouseButton1Click:Connect(function()
+        notification:Destroy()
+    end)
+end)
+CreateButton(MiscTab, "重置统计", function()
+    getgenv().StatisticsData = {
+        TotalFishCaught = 0,
+        TotalValueEarned = 0,
+        SessionStartTime = tick(),
+        RareCatches = 0,
+        LegendaryCatches = 0,
+        MythicCatches = 0,
+        TotalChestsOpened = 0,
+        TotalDistance = 0,
+        LastPosition = nil
+    }
+end)
+
+CreateLabel(MiscTab, "💾 配置管理")
+CreateButton(MiscTab, "保存配置", function()
+    local config = {
+        AbyssMemoryESP = getgenv().AbyssMemoryESP,
+        AbyssAutoMinigame = getgenv().AbyssAutoMinigame,
+        AbyssHitboxExpander = getgenv().AbyssHitboxExpander,
+        AbyssChestESP = getgenv().AbyssChestESP,
+        HitboxSize = getgenv().HitboxSize,
+        WalkSpeed = getgenv().WalkSpeed,
+        JumpHeight = getgenv().JumpHeight,
+        FlySpeed = getgenv().FlySpeed,
+        FOVValue = getgenv().FOVValue
+    }
+    writefile("AbyssAIO_Config.json", HttpService:JSONEncode(config))
+end)
+CreateButton(MiscTab, "加载配置", function()
+    if isfile("AbyssAIO_Config.json") then
+        local config = HttpService:JSONDecode(readfile("AbyssAIO_Config.json"))
+        for k, v in pairs(config) do
+            getgenv()[k] = v
+        end
+    end
+end)
+
+local function PassFilter(data)
+    if not data then return false end
+    local passFish = true
+    if #getgenv().FilterFish > 0 then
+        passFish = false
+        local checkName = string.lower(data.Name or "")
+        local checkVar = string.lower(data.Variation or "")
+        for _, f in ipairs(getgenv().FilterFish) do
+            if string.find(checkName, f) or string.find(checkVar, f) then
+                passFish = true
+                break
+            end
+        end
+    end
+    
+    local passMut = true
+    if #getgenv().FilterMutations > 0 then
+        passMut = false
+        local checkMut = string.lower(data.Mutations or "")
+        if checkMut ~= "" then
+            for _, m in ipairs(getgenv().FilterMutations) do
+                if string.find(checkMut, m) then
+                    passMut = true
+                    break
+                end
+            end
+        end
+    end
+    
+    local passRarity = true
+    if #getgenv().FilterRarity > 0 then
+        passRarity = false
+        local checkRarity = string.lower(data.Rarity or "")
+        if checkRarity ~= "" then
+            for _, r in ipairs(getgenv().FilterRarity) do
+                if string.find(checkRarity, r) then
+                    passRarity = true
+                    break
+                end
+            end
+        end
+    end
+    
+    return passFish and passMut and passRarity
+end
+
+task.spawn(function()
+    while task.wait(1.5) do
+        pcall(function()
+            local nf, nc, nn, ni = {}, {}, {}, {}
+            for _, obj in pairs(getgc(true)) do
+                if type(obj) == "table" then
+                    local model = rawget(obj, "model") or rawget(obj, "Model") or rawget(obj, "instance") or rawget(obj, "Instance")
+                    if typeof(model) == "Instance" and model:IsDescendantOf(workspace) then
+                        local dataTbl = rawget(obj, "boiddata") or rawget(obj, "data") or obj
+                        
+                        if string.find(model.Name:lower(), "chest") then
+                            local cName = rawget(dataTbl, "name") or rawget(dataTbl, "Name") or model.Name
+                            local cTier = rawget(dataTbl, "tier") or rawget(dataTbl, "Tier") or ""
+                            nc[model] = {Name = cName, Tier = tostring(cTier)}
+                        elseif string.find(model.Name:lower(), "npc") then
+                            local nName = rawget(dataTbl, "name") or rawget(dataTbl, "Name") or model.Name
+                            nn[model] = {Name = nName}
+                        else
+                            local fName = rawget(dataTbl, "name") or rawget(dataTbl, "Name")
+                            if type(fName) == "string" then
+                                local fVar = rawget(dataTbl, "variation") or ""
+                                local fRarity = rawget(dataTbl, "rarity") or ""
+                                local fValue = rawget(dataTbl, "value") or 0
+                                local fWeight = rawget(dataTbl, "weight") or 0
+                                local fMuts, mutStr = rawget(dataTbl, "mutations"), ""
+                                if type(fMuts) == "table" then
+                                    local ml = {}
+                                    for _, m in pairs(fMuts) do
+                                        table.insert(ml, tostring(m))
+                                    end
+                                    mutStr = table.concat(ml, ", ")
+                                end
+                                nf[model] = {
+                                    Name = fName,
+                                    Variation = tostring(fVar),
+                                    Mutations = mutStr,
+                                    Rarity = tostring(fRarity),
+                                    Value = tonumber(fValue),
+                                    Weight = tonumber(fWeight)
+                                }
+                            end
+                        end
+                    end
+                end
+            end
+            getgenv().FishDatabase = nf
+            getgenv().ChestDatabase = nc
+            getgenv().NPCDatabase = nn
+            getgenv().ItemDatabase = ni
+        end)
+    end
+end)
+
+local ActiveESP = {}
+local function UpdateESP(model, state, espType)
+    if state then
+        if ActiveESP[model] then return end
+        
+        local bb = Instance.new("BillboardGui", model)
+        bb.Size = UDim2.new(0, 250, 0, 60)
+        bb.AlwaysOnTop = true
+        bb.Adornee = model
+        bb.StudsOffset = Vector3.new(0, 2, 0)
+        
+        local txt = Instance.new("TextLabel", bb)
+        txt.Size = UDim2.new(1, 0, 1, 0)
+        txt.BackgroundTransparency = 1
+        txt.Font = Enum.Font.GothamBold
+        txt.TextSize = 11
+        txt.TextStrokeTransparency = 0.5
+        txt.Text = "扫描中..."
+        
+        if espType == "chest" then
+            txt.TextColor3 = Color3.fromRGB(255, 170, 0)
+        elseif espType == "npc" then
+            txt.TextColor3 = Color3.fromRGB(100, 255, 100)
+        elseif espType == "item" then
+            txt.TextColor3 = Color3.fromRGB(255, 100, 255)
+        else
+            txt.TextColor3 = Color3.fromRGB(255, 200, 50)
+        end
+        
+        local hl = nil
+        if espType == "chest" or espType == "item" then
+            hl = Instance.new("Highlight", model)
+            hl.Name = "ESPHighlight"
+            hl.FillTransparency = 0.5
+            hl.OutlineTransparency = 0
+            hl.OutlineColor = Color3.new(1, 1, 1)
+            
+            if espType == "chest" then
+                hl.FillColor = Color3.fromRGB(255, 170, 0)
+            else
+                hl.FillColor = Color3.fromRGB(255, 100, 255)
+            end
+        end
+        
+        ActiveESP[model] = {UI = bb, Highlight = hl, Type = espType}
+    else
+        if ActiveESP[model] then
+            if ActiveESP[model].UI then
+                ActiveESP[model].UI:Destroy()
+            end
+            if ActiveESP[model].Highlight then
+                ActiveESP[model].Highlight:Destroy()
+            end
+            ActiveESP[model] = nil
+        end
+    end
+end
+
+local ChestsFolder = workspace:FindFirstChild("Game") and workspace.Game:FindFirstChild("Chests")
+local NPCFolder = workspace:FindFirstChild("NPCs")
+local ItemsFolder = workspace:FindFirstChild("Items")
+
+RunService.RenderStepped:Connect(function()
+    local camPos = Camera.CFrame.Position
+    local fEnabled = getgenv().AbyssMemoryESP
+    local cEnabled = getgenv().AbyssChestESP
+    local nEnabled = getgenv().AbyssNPCESP
+    local iEnabled = getgenv().AbyssItemESP
+    
+    local ff = workspace:FindFirstChild("Game")
+    if ff then ff = ff:FindFirstChild("Fish") end
+    if ff then ff = ff:FindFirstChild("client") end
+    if ff then
+        for _, f in ipairs(ff:GetChildren()) do
+            UpdateESP(f, fEnabled, "fish")
+        end
+    end
+    
+    if cEnabled then
+        if ChestsFolder then
+            for _, v in ipairs(ChestsFolder:GetChildren()) do
+                if (v:IsA("Model") or v:IsA("BasePart")) and string.find(v.Name:lower(), "chest") then
+                    UpdateESP(v, true, "chest")
+                end
+            end
+        else
+            for _, v in ipairs(workspace:GetDescendants()) do
+                if (v:IsA("Model") or v:IsA("BasePart")) and string.find(v.Name:lower(), "chest") then
+                    UpdateESP(v, true, "chest")
+                end
+            end
+        end
+    end
+    
+    if nEnabled then
+        if NPCFolder then
+            for _, v in ipairs(NPCFolder:GetChildren()) do
+                if v:IsA("Model") then
+                    UpdateESP(v, true, "npc")
+                end
+            end
+        end
+    end
+    
+    if iEnabled then
+        if ItemsFolder then
+            for _, v in ipairs(ItemsFolder:GetChildren()) do
+                if v:IsA("Model") or v:IsA("BasePart") then
+                    UpdateESP(v, true, "item")
+                end
+            end
+        end
+    end
+    
+    for model, esp in pairs(ActiveESP) do
+        local espType = esp.Type
+        local isEnabled = false
+        
+        if espType == "fish" then
+            isEnabled = fEnabled
+        elseif espType == "chest" then
+            isEnabled = cEnabled
+        elseif espType == "npc" then
+            isEnabled = nEnabled
+        elseif espType == "item" then
+            isEnabled = iEnabled
+        end
+        
+        if not model.Parent or not isEnabled then
+            UpdateESP(model, false)
+        else
+            local pos = model:IsA("Model") and model:GetPivot().Position or model.Position
+            local dist = math.floor((pos - camPos).Magnitude)
+            
+            if dist > getgenv().ESPMaxDistance then
+                esp.UI.Enabled = false
+                if esp.Highlight then
+                    esp.Highlight.Enabled = false
+                end
+            else
+                local txt = esp.UI:FindFirstChild("TextLabel")
+                if txt then
+                    if espType == "chest" then
+                        esp.UI.Enabled = true
+                        if esp.Highlight then
+                            esp.Highlight.Enabled = true
+                        end
+                        local data = getgenv().ChestDatabase[model]
+                        if data then
+                            txt.Text = string.format("%s 箱子\n等级: %s\n[%dm]", data.Name, data.Tier, dist)
+                        else
+                            txt.Text = string.format("宝箱\n[%dm]", dist)
+                        end
+                    elseif espType == "npc" then
+                        esp.UI.Enabled = true
+                        local data = getgenv().NPCDatabase[model]
+                        if data then
+                            txt.Text = string.format("NPC: %s\n[%dm]", data.Name, dist)
+                        else
+                            txt.Text = string.format("NPC\n[%dm]", dist)
+                        end
+                    elseif espType == "item" then
+                        esp.UI.Enabled = true
+                        if esp.Highlight then
+                            esp.Highlight.Enabled = true
+                        end
+                        txt.Text = string.format("物品\n[%dm]", dist)
+                    else
+                        local data = getgenv().FishDatabase[model]
+                        if not data then
+                            if (#getgenv().FilterFish > 0 or #getgenv().FilterMutations > 0 or #getgenv().FilterRarity > 0) then
+                                esp.UI.Enabled = false
+                            else
+                                esp.UI.Enabled = true
+                                txt.Text = string.format("扫描中...\n[%dm]", dist)
+                            end
+                        else
+                            if not PassFilter(data) then
+                                esp.UI.Enabled = false
+                            else
+                                esp.UI.Enabled = true
+                                
+                                local displayName = data.Variation ~= "" and data.Variation .. " " .. data.Name or data.Name
+                                local mutText = data.Mutations ~= "" and "\n<" .. data.Mutations .. ">" or ""
+                                local rarityText = data.Rarity ~= "" and "\n[" .. data.Rarity .. "]" or ""
+                                local valueText = getgenv().AbyssShowFishValue and data.Value and "\n$" .. tostring(data.Value) or ""
+                                local weightText = getgenv().AbyssShowWeight and data.Weight and "\n" .. tostring(data.Weight) .. "kg" or ""
+                                
+                                txt.Text = string.format("%s%s%s%s%s\n[%dm]", displayName, mutText, rarityText, valueText, weightText, dist)
+                                
+                                if data.Mutations ~= "" then
+                                    txt.TextColor3 = Color3.fromRGB(255, 80, 255)
+                                elseif data.Rarity and string.find(string.lower(data.Rarity), "mythic") then
+                                    txt.TextColor3 = Color3.fromRGB(255, 0, 0)
+                                elseif data.Rarity and string.find(string.lower(data.Rarity), "legendary") then
+                                    txt.TextColor3 = Color3.fromRGB(255, 215, 0)
+                                elseif data.Variation ~= "" then
+                                    txt.TextColor3 = Color3.fromRGB(255, 200, 50)
+                                else
+                                    txt.TextColor3 = Color3.fromRGB(100, 255, 150)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.5) do
+        pcall(function()
+            local ff = workspace:FindFirstChild("Game")
+            if ff then ff = ff:FindFirstChild("Fish") end
+            if ff then ff = ff:FindFirstChild("client") end
+            if ff then
+                for _, f in ipairs(ff:GetChildren()) do
+                    local d = getgenv().FishDatabase[f]
+                    local expand = getgenv().AbyssHitboxExpander and PassFilter(d)
+                    for _, p in ipairs(f:GetDescendants()) do
+                        if p:IsA("BasePart") then
+                            if not p:GetAttribute("OrigSize") then
+                                p:SetAttribute("OrigSize", p.Size)
+                                p:SetAttribute("OrigTrans", p.Transparency)
+                                p:SetAttribute("OrigCollide", p.CanCollide)
+                            end
+                            if expand then
+                                p.Size = Vector3.new(getgenv().HitboxSize, getgenv().HitboxSize, getgenv().HitboxSize)
+                                p.Transparency = 0.7
+                                p.CanCollide = false
+                            else
+                                p.Size = p:GetAttribute("OrigSize")
+                                p.Transparency = p:GetAttribute("OrigTrans")
+                                p.CanCollide = p:GetAttribute("OrigCollide")
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+local InfoGui = Instance.new("ScreenGui")
+InfoGui.Name = "AbyssInfo"
+InfoGui.ResetOnSpawn = false
+InfoGui.Parent = PlayerGui
+
+local InfoFrame = Instance.new("Frame")
+InfoFrame.Size = UDim2.new(0, 200, 0, 150)
+InfoFrame.Position = UDim2.new(0, 10, 0.5, -75)
+InfoFrame.BackgroundColor3 = Color3.fromRGB(20, 25, 30)
+InfoFrame.BackgroundTransparency = 0.3
+InfoFrame.BorderSizePixel = 0
+InfoFrame.Visible = false
+InfoFrame.Parent = InfoGui
+Instance.new("UICorner", InfoFrame).CornerRadius = UDim.new(0, 8)
+
+local InfoText = Instance.new("TextLabel")
+InfoText.Size = UDim2.new(1, -10, 1, -10)
+InfoText.Position = UDim2.new(0, 5, 0, 5)
+InfoText.BackgroundTransparency = 1
+InfoText.Font = Enum.Font.GothamBold
+InfoText.TextSize = 10
+InfoText.TextColor3 = Color3.new(1, 1, 1)
+InfoText.TextXAlignment = Enum.TextXAlignment.Left
+InfoText.TextYAlignment = Enum.TextYAlignment.Top
+InfoText.Text = ""
+InfoText.Parent = InfoFrame
+
+task.spawn(function()
+    while task.wait(0.5) do
+        if getgenv().AbyssShowCoordinates or getgenv().AbyssShowDepth or getgenv().AbyssShowTime or getgenv().AbyssShowPlayerStats then
+            InfoFrame.Visible = true
+            local infoLines = {}
+            
+            if getgenv().AbyssShowTime then
+                table.insert(infoLines, "⏰ " .. os.date("%H:%M:%S"))
+            end
+            
+            if getgenv().AbyssShowCoordinates and HumanoidRootPart then
+                local pos = HumanoidRootPart.Position
+                table.insert(infoLines, string.format("📍 X:%.1f Y:%.1f Z:%.1f", pos.X, pos.Y, pos.Z))
+            end
+            
+            if getgenv().AbyssShowDepth and HumanoidRootPart then
+                local depth = math.abs(HumanoidRootPart.Position.Y)
+                table.insert(infoLines, string.format("🌊 深度: %.1fm", depth))
+            end
+            
+            if getgenv().AbyssShowPlayerStats and Humanoid then
+                table.insert(infoLines, string.format("💚 生命: %.0f/%.0f", Humanoid.Health, Humanoid.MaxHealth))
+                table.insert(infoLines, string.format("🏃 速度: %.1f", Humanoid.WalkSpeed))
+            end
+            
+            if getgenv().AbyssShowInventoryValue then
+                local totalValue = 0
+                for _, fish in pairs(getgenv().FishDatabase) do
+                    if fish.Value then
+                        totalValue = totalValue + fish.Value
+                    end
+                end
+                table.insert(infoLines, string.format("💰 背包: $%d", totalValue))
+            end
+            
+            InfoText.Text = table.concat(infoLines, "\n")
+        else
+            InfoFrame.Visible = false
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(1) do
+        if getgenv().AbyssAntiAFK then
+            pcall(function()
+                local VirtualUser = game:GetService("VirtualUser")
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
+            end)
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait() do
+        if getgenv().AbyssNoclip and Character then
+            for _, part in pairs(Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end
+end)
+
+local flyConnection
+task.spawn(function()
+    while task.wait() do
+        if getgenv().AbyssFlyMode and HumanoidRootPart then
+            if not flyConnection then
+                local BG = Instance.new("BodyGyro", HumanoidRootPart)
+                local BV = Instance.new("BodyVelocity", HumanoidRootPart)
+                BG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+                BG.CFrame = HumanoidRootPart.CFrame
+                BV.Velocity = Vector3.new(0, 0, 0)
+                BV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+                
+                flyConnection = RunService.Heartbeat:Connect(function()
+                    if getgenv().AbyssFlyMode then
+                        BG.CFrame = Camera.CFrame
+                        local moveVector = Vector3.new()
+                        
+                        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                            moveVector = moveVector + Camera.CFrame.LookVector
+                        end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                            moveVector = moveVector - Camera.CFrame.LookVector
+                        end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                            moveVector = moveVector + Camera.CFrame.RightVector
+                        end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                            moveVector = moveVector - Camera.CFrame.RightVector
+                        end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                            moveVector = moveVector + Vector3.new(0, 1, 0)
+                        end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+                            moveVector = moveVector - Vector3.new(0, 1, 0)
+                        end
+                        
+                        BV.Velocity = moveVector * getgenv().FlySpeed
+                    end
+                end)
+            end
+        else
+            if flyConnection then
+                flyConnection:Disconnect()
+                flyConnection = nil
+                for _, obj in pairs(HumanoidRootPart:GetChildren()) do
+                    if obj:IsA("BodyGyro") or obj:IsA("BodyVelocity") then
+                        obj:Destroy()
+                    end
+                end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.1) do
+        if getgenv().AbyssInfiniteOxygen or getgenv().AbyssAntiDrown then
+            pcall(function()
+                if Character then
+                    local oxygen = Character:FindFirstChild("Oxygen")
+                    if oxygen and oxygen:IsA("NumberValue") then
+                        oxygen.Value = 100
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.1) do
+        if getgenv().AbyssInfiniteStamina then
+            pcall(function()
+                if Character then
+                    local stamina = Character:FindFirstChild("Stamina")
+                    if stamina and stamina:IsA("NumberValue") then
+                        stamina.Value = 100
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait() do
+        if getgenv().AbyssWalkOnWater and HumanoidRootPart then
+            pcall(function()
+                local ray = Ray.new(HumanoidRootPart.Position, Vector3.new(0, -10, 0))
+                local hit, position = workspace:FindPartOnRay(ray, Character)
+                
+                if hit and hit.Name == "Water" then
+                    if not HumanoidRootPart:FindFirstChild("WaterPlatform") then
+                        local platform = Instance.new("Part")
+                        platform.Name = "WaterPlatform"
+                        platform.Size = Vector3.new(10, 1, 10)
+                        platform.Transparency = 1
+                        platform.CanCollide = true
+                        platform.Anchored = true
+                        platform.Parent = HumanoidRootPart
+                    end
+                    
+                    local platform = HumanoidRootPart:FindFirstChild("WaterPlatform")
+                    if platform then
+                        platform.CFrame = CFrame.new(HumanoidRootPart.Position.X, position.Y + 0.5, HumanoidRootPart.Position.Z)
+                    end
+                else
+                    local platform = HumanoidRootPart:FindFirstChild("WaterPlatform")
+                    if platform then
+                        platform:Destroy()
+                    end
+                end
+            end)
+        else
+            if HumanoidRootPart then
+                local platform = HumanoidRootPart:FindFirstChild("WaterPlatform")
+                if platform then
+                    platform:Destroy()
+                end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.1) do
+        if getgenv().AbyssGodMode and Humanoid then
+            pcall(function()
+                Humanoid.Health = Humanoid.MaxHealth
+            end)
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(2) do
+        if getgenv().AbyssAutoSell then
+            pcall(function()
+                local sellPrompt = PlayerGui:FindFirstChild("SellPrompt", true)
+                if sellPrompt then
+                    local sellButton = sellPrompt:FindFirstChild("Sell", true)
+                    if sellButton and sellButton:IsA("TextButton") then
+                        firesignal(sellButton.MouseButton1Click)
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.5) do
+        if getgenv().AbyssRemoveWater then
+            pcall(function()
+                for _, v in pairs(workspace:GetDescendants()) do
+                    if v:IsA("Part") and v.Name:lower():find("water") then
+                        v.Transparency = 1
+                        v.CanCollide = false
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.5) do
+        if getgenv().AbyssXRay then
+            pcall(function()
+                for _, v in pairs(workspace:GetDescendants()) do
+                    if v:IsA("Part") or v:IsA("MeshPart") then
+                        if not v:GetAttribute("OrigTransparency") then
+                            v:SetAttribute("OrigTransparency", v.Transparency)
+                        end
+                        v.Transparency = 0.7
+                    end
+                end
+            end)
+        else
+            pcall(function()
+                for _, v in pairs(workspace:GetDescendants()) do
+                    if v:IsA("Part") or v:IsA("MeshPart") then
+                        if v:GetAttribute("OrigTransparency") then
+                            v.Transparency = v:GetAttribute("OrigTransparency")
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.1) do
+        if HumanoidRootPart and getgenv().StatisticsData.LastPosition then
+            local dist = (HumanoidRootPart.Position - getgenv().StatisticsData.LastPosition).Magnitude
+            getgenv().StatisticsData.TotalDistance = getgenv().StatisticsData.TotalDistance + dist
+        end
+        if HumanoidRootPart then
+            getgenv().StatisticsData.LastPosition = HumanoidRootPart.Position
+        end
+    end
+end)
+
+Player.CharacterAdded:Connect(function(char)
+    Character = char
+    Humanoid = char:WaitForChild("Humanoid")
+    HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
+end)
+
+local NotificationGui = Instance.new("ScreenGui")
+NotificationGui.Name = "AbyssNotifications"
+NotificationGui.ResetOnSpawn = false
+NotificationGui.Parent = CoreGui
+
+local function SendNotification(title, text, duration)
+    local notif = Instance.new("Frame")
+    notif.Size = UDim2.new(0, 300, 0, 80)
+    notif.Position = UDim2.new(1, -310, 1, 10)
+    notif.BackgroundColor3 = Color3.fromRGB(30, 35, 40)
+    notif.BorderSizePixel = 0
+    notif.Parent = NotificationGui
+    Instance.new("UICorner", notif).CornerRadius = UDim.new(0, 8)
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, -10, 0, 25)
+    titleLabel.Position = UDim2.new(0, 5, 0, 5)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 14
+    titleLabel.Text = title
+    titleLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = notif
+    
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, -10, 1, -35)
+    textLabel.Position = UDim2.new(0, 5, 0, 30)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Font = Enum.Font.Gotham
+    textLabel.TextSize = 12
+    textLabel.Text = text
+    textLabel.TextColor3 = Color3.new(1, 1, 1)
+    textLabel.TextXAlignment = Enum.TextXAlignment.Left
+    textLabel.TextYAlignment = Enum.TextYAlignment.Top
+    textLabel.TextWrapped = true
+    textLabel.Parent = notif
+    
+    notif:TweenPosition(UDim2.new(1, -310, 1, -90), "Out", "Quart", 0.5, true)
+    
+    task.delay(duration or 3, function()
+        notif:TweenPosition(UDim2.new(1, -310, 1, 10), "In", "Quart", 0.5, true, function()
+            notif:Destroy()
+        end)
+    end)
+end
+
+SendNotification("⚡ Abyss AIO Pro", "脚本已成功加载!\n版本: 2.5", 5)
+
+print("Abyss AIO Pro v2.5 已加载")
+print("功能: 60+")
+print("作者: Abyss Team")
