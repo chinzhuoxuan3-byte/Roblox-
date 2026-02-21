@@ -413,12 +413,98 @@ local function D(t, props)
 end
 
 local BONES = {
-    {"Head","UpperTorso"},{"UpperTorso","LowerTorso"},
-    {"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},
-    {"UpperTorso","RightUpperArm"},{"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"},
-    {"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},
-    {"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"},
+    -- 头部到躯干
+    {"Head", "UpperTorso"},
+    {"Head", "LowerTorso"},
+    
+    -- 躯干
+    {"UpperTorso", "LowerTorso"},
+    
+    -- 左臂
+    {"UpperTorso", "LeftUpperArm"},
+    {"LeftUpperArm", "LeftLowerArm"},
+    {"LeftLowerArm", "LeftHand"},
+    
+    -- 右臂
+    {"UpperTorso", "RightUpperArm"},
+    {"RightUpperArm", "RightLowerArm"},
+    {"RightLowerArm", "RightHand"},
+    
+    -- 左腿
+    {"LowerTorso", "LeftUpperLeg"},
+    {"LeftUpperLeg", "LeftLowerLeg"},
+    {"LeftLowerLeg", "LeftFoot"},
+    
+    -- 右腿
+    {"LowerTorso", "RightUpperLeg"},
+    {"RightUpperLeg", "RightLowerLeg"},
+    {"RightLowerLeg", "RightFoot"},
 }
+
+local ALTERNATE_BONES = {
+    -- 备用骨骼名称（某些游戏可能用不同的命名）
+    Head = {"Head", "Handle", "HeadAttachment"},
+    UpperTorso = {"UpperTorso", "Torso", "UpperBody", "Chest"},
+    LowerTorso = {"LowerTorso", "LowerBody", "Hip", "Waist"},
+    LeftUpperArm = {"LeftUpperArm", "Left Arm", "LeftArm", "Left Shoulder"},
+    LeftLowerArm = {"LeftLowerArm", "Left Forearm", "LeftLowerArm"},
+    LeftHand = {"LeftHand", "Left Hand", "Left Palm"},
+    RightUpperArm = {"RightUpperArm", "Right Arm", "RightArm", "Right Shoulder"},
+    RightLowerArm = {"RightLowerArm", "Right Forearm", "RightLowerArm"},
+    RightHand = {"RightHand", "Right Hand", "Right Palm"},
+    LeftUpperLeg = {"LeftUpperLeg", "Left Thigh", "LeftLeg"},
+    LeftLowerLeg = {"LeftLowerLeg", "Left Calf", "LeftLowerLeg"},
+    LeftFoot = {"LeftFoot", "Left Foot", "Left Ankle"},
+    RightUpperLeg = {"RightUpperLeg", "Right Thigh", "RightLeg"},
+    RightLowerLeg = {"RightLowerLeg", "Right Calf", "RightLowerLeg"},
+    RightFoot = {"RightFoot", "Right Foot", "Right Ankle"},
+}
+
+local function FindBone(character, boneName)
+    -- 首先尝试直接查找
+    local part = character:FindFirstChild(boneName)
+    if part and part:IsA("BasePart") then
+        return part
+    end
+    
+    -- 尝试查找备用名称
+    local alternatives = ALTERNATE_BONES[boneName]
+    if alternatives then
+        for _, altName in ipairs(alternatives) do
+            part = character:FindFirstChild(altName)
+            if part and part:IsA("BasePart") then
+                return part
+            end
+        end
+    end
+    
+    -- 递归查找所有子级
+    for _, descendant in ipairs(character:GetDescendants()) do
+        if descendant:IsA("BasePart") then
+            if descendant.Name:lower():find(boneName:lower()) then
+                return descendant
+            end
+            -- 检查备用名称
+            if alternatives then
+                for _, altName in ipairs(alternatives) do
+                    if descendant.Name:lower():find(altName:lower()) then
+                        return descendant
+                    end
+                end
+            end
+        end
+    end
+    
+    return nil
+end
+
+local function GetBonePosition(character, boneName)
+    local bone = FindBone(character, boneName)
+    if bone then
+        return bone.Position
+    end
+    return nil
+end
 
 local function MakeESP(target)
     if ESPObjects[target] then return ESPObjects[target] end
@@ -698,16 +784,18 @@ RunService.RenderStepped:Connect(function()
                 if not obj.Skel[i] then
                     obj.Skel[i] = D("Line",{Visible=false,Thickness=1,Color=Color3.new(1,1,1)})
                 end
-                local a = char:FindFirstChild(pair[1])
-                local b = char:FindFirstChild(pair[2])
-                if a and b then
-                    local p1, o1 = ScreenPos(a.Position)
-                    local p2, o2 = ScreenPos(b.Position)
+                local bone1 = FindBone(char, pair[1])
+                local bone2 = FindBone(char, pair[2])
+                if bone1 and bone2 then
+                    local p1, o1 = ScreenPos(bone1.Position)
+                    local p2, o2 = ScreenPos(bone2.Position)
                     obj.Skel[i].From    = p1
                     obj.Skel[i].To      = p2
                     obj.Skel[i].Color   = sc
                     obj.Skel[i].Visible = o1 and o2
-                else obj.Skel[i].Visible = false end
+                else
+                    obj.Skel[i].Visible = false
+                end
             end
         else
             for _, l in ipairs(obj.Skel) do l.Visible = false end
