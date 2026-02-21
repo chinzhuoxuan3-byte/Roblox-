@@ -1,0 +1,1332 @@
+local realGame = cloneref and cloneref(game) or game
+local realPlayers = realGame:GetService("Players")
+local realWorkspace = realGame:GetService("Workspace")
+local realRun = realGame:GetService("RunService")
+local realUIS = realGame:GetService("UserInputService")
+local realTeams = realGame:GetService("Teams")
+
+if getgenv then
+    getgenv().game = realGame
+end
+
+local WindUI = loadstring(realGame:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+
+local Window = WindUI:CreateWindow({
+    Title = "Skid hub",
+    Icon = "crown",
+    Author = "Yeskid",
+    Folder = "Skidhub",
+    Size = UDim2.fromOffset(580, 460),
+    Transparent = true,
+    Theme = "Dark",
+    SideBarWidth = 200,
+    HasOutline = false,
+    Background = "rbxassetid://127681877075540"
+})
+
+local Players = realPlayers
+local RunService = realRun
+local UserInputService = realUIS
+local TeamsService = realTeams
+local Workspace = realWorkspace
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local function Char() return LocalPlayer.Character end
+local function Root() local c = Char() return c and c:FindFirstChild("HumanoidRootPart") end
+local function Hum() local c = Char() return c and c:FindFirstChildOfClass("Humanoid") end
+
+local ColorMap = {
+    ["白色"] = Color3.fromRGB(255,255,255),
+    ["红色"] = Color3.fromRGB(255,0,0),
+    ["绿色"] = Color3.fromRGB(0,255,0),
+    ["蓝色"] = Color3.fromRGB(0,0,255),
+    ["黄色"] = Color3.fromRGB(255,255,0),
+    ["橙色"] = Color3.fromRGB(255,165,0),
+    ["紫色"] = Color3.fromRGB(170,0,255),
+    ["青色"] = Color3.fromRGB(0,255,255),
+    ["粉色"] = Color3.fromRGB(255,105,180),
+    ["黑色"] = Color3.fromRGB(20,20,20),
+}
+local ColorNames = {"白色","红色","绿色","蓝色","黄色","橙色","紫色","青色","粉色","黑色"}
+
+local FontMap = {
+    ["UI"] = Drawing.Fonts.UI,
+    ["系统"] = Drawing.Fonts.System,
+    ["等宽"] = Drawing.Fonts.Monospace,
+}
+local FontNames = {"UI","系统","等宽"}
+
+local Cfg = {
+    Enabled = false,
+    WallCheck = true,
+    MinHealth = 0,
+    AliveOnly = true,
+    RagdollCheck = false,
+    MaxDist = 1000,
+    EquipBlacklist = "",
+    BackpackBlacklist = "",
+    WhitelistMode = false,
+    BlacklistMode = false,
+    Whitelist = {},
+    Blacklist = {},
+    TeamFilters = {},
+
+    Box2D = false,
+    Box2DColor = Color3.fromRGB(255,255,255),
+    Box2DThick = 1,
+    Box2DRainbow = false,
+
+    Box3D = false,
+    Box3DColor = Color3.fromRGB(255,255,255),
+    Box3DRainbow = false,
+
+    Highlight = false,
+    HighlightColor = Color3.fromRGB(255,0,0),
+    HighlightRainbow = false,
+
+    Skeleton = false,
+    SkeletonColor = Color3.fromRGB(255,255,255),
+    SkeletonRainbow = false,
+
+    NameEnabled = false,
+    NameMode = "名字",
+    NameColor = Color3.fromRGB(255,255,255),
+    NameRainbow = false,
+
+    DistEnabled = false,
+    DistColor = Color3.fromRGB(255,255,255),
+    DistRainbow = false,
+
+    HealthBar = false,
+    HealthBarPos = "左边",
+    HealthNumeric = false,
+
+    EquipDisplay = false,
+
+    Tracer = false,
+    TracerOrigin = "底部",
+    TracerColor = Color3.fromRGB(255,255,255),
+    TracerRainbow = false,
+
+    FOVEnabled = false,
+    FOVSize = 150,
+    FOVColor = Color3.fromRGB(255,255,255),
+    FOVRainbow = false,
+    FOVShape = "圆形",
+    FOVOnly = false,
+
+    Radar = false,
+
+    NpcESP = false,
+    ItemESP = false,
+    ItemPaths = "",
+    BackpackESP = false,
+
+    VehicleESP = false,
+    BulletTrail = false,
+    BulletTrailColor = Color3.fromRGB(255,0,0),
+    BulletTrailSize = 1,
+    StatsDisplay = false,
+
+    InteractiveESP = false,
+    InteractiveColor = Color3.fromRGB(0,255,255),
+
+    CustomTextSize = 14,
+    CustomFont = "UI",
+    CustomNameTemplate = "{name}",
+    CustomDistTemplate = "{dist}m",
+    CustomHealthTemplate = "{health}/{max}",
+
+    Priority = "距离",
+}
+
+local ESPObjects = {}
+local NpcObjects = {}
+local ItemObjects = {}
+local InteractiveObjects = {}
+local VehicleObjects = {}
+local BulletTrails = {}
+local RainbowHue = 0
+local PlayerListNames = {}
+local GameTeams = {}
+local SelectedPlayers = {}
+
+local ItemESPGui = Instance.new("ScreenGui")
+ItemESPGui.Name = "ItemESP"
+ItemESPGui.IgnoreGuiInset = true
+ItemESPGui.Enabled = false
+ItemESPGui.Parent = PlayerGui
+
+local StatsGui = Instance.new("ScreenGui")
+StatsGui.Name = "StatsDisplay"
+StatsGui.IgnoreGuiInset = true
+StatsGui.Enabled = false
+StatsGui.Parent = PlayerGui
+
+local StatsFrame = Instance.new("Frame")
+StatsFrame.Size = UDim2.new(0,200,0,80)
+StatsFrame.Position = UDim2.new(1,-210,0,150)
+StatsFrame.BackgroundColor3 = Color3.new(0,0,0)
+StatsFrame.BackgroundTransparency = 0.5
+StatsFrame.BorderSizePixel = 0
+StatsFrame.Parent = StatsGui
+
+local StatsLayout = Instance.new("UIListLayout")
+StatsLayout.Padding = UDim.new(0,2)
+StatsLayout.Parent = StatsFrame
+
+local function MakeStatLabel(parent)
+    local l = Instance.new("TextLabel")
+    l.Size = UDim2.new(1,0,0,22)
+    l.BackgroundTransparency = 1
+    l.Font = Enum.Font.SourceSansBold
+    l.TextSize = 14
+    l.TextColor3 = Color3.new(1,1,1)
+    l.TextStrokeTransparency = 0
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.Parent = parent
+    return l
+end
+
+local PlayerCountLabel = MakeStatLabel(StatsFrame)
+local TeamCountLabel   = MakeStatLabel(StatsFrame)
+local ESPCountLabel    = MakeStatLabel(StatsFrame)
+
+local function UpdateGameTeams()
+    local ok, teams = pcall(function() return TeamsService:GetTeams() end)
+    GameTeams = (ok and teams) or {}
+end
+
+local function IsVisible(char)
+    if not Cfg.WallCheck then return true end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = {char, Char() or Workspace}
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    local result = Workspace:Raycast(Camera.CFrame.Position, hrp.Position - Camera.CFrame.Position, params)
+    return result == nil
+end
+
+local function PassTeamCheck(target)
+    if #GameTeams == 0 then return true end
+    local playerTeam = target.Team
+    if not playerTeam then return true end
+    for _, team in ipairs(GameTeams) do
+        if playerTeam == team then
+            local f = Cfg.TeamFilters[team.Name]
+            return f == nil and true or f
+        end
+    end
+    return true
+end
+
+local function SplitCSV(str)
+    local t = {}
+    for s in string.gmatch(str, "[^,]+") do
+        table.insert(t, s:match("^%s*(.-)%s*$"))
+    end
+    return t
+end
+
+local function ResolvePath(pathStr)
+    pathStr = pathStr:match("^%s*(.-)%s*$")
+    local result = nil
+    pcall(function()
+        local env = setmetatable({
+            workspace = Workspace,
+            game = game,
+            Workspace = Workspace,
+        }, {__index = getfenv and getfenv() or {}})
+        local fn = loadstring and loadstring("return " .. pathStr)
+        if fn then
+            setfenv(fn, env)
+            result = fn()
+        end
+    end)
+    if result then return result end
+    pcall(function()
+        local tokens = {}
+        for tok in pathStr:gmatch("[^%.]+") do
+            table.insert(tokens, tok)
+        end
+        local cur
+        local first = tokens[1]
+        if first == "workspace" or first == "Workspace" then
+            cur = Workspace
+        elseif first == "game" then
+            cur = game
+        else
+            cur = Workspace:FindFirstChild(first)
+        end
+        if not cur then return end
+        for i = 2, #tokens do
+            local tok = tokens[i]
+            local getChildren = tok:match("^GetChildren%(%)")
+            if getChildren then
+                cur = cur:GetChildren()
+            else
+                local idx = tok:match("^%[(%d+)%]$")
+                if idx then
+                    if type(cur) == "table" then
+                        cur = cur[tonumber(idx)]
+                    end
+                else
+                    local name, childIdx = tok:match("^(.+):GetChildren%(%)\[(%d+)%]$")
+                    if name and childIdx then
+                        local child = cur:FindFirstChild(name)
+                        if child then cur = child:GetChildren()[tonumber(childIdx)] end
+                    else
+                        if type(cur) == "table" then
+                            for _, v in ipairs(cur) do
+                                if v.Name == tok then cur = v; break end
+                            end
+                        else
+                            cur = cur:FindFirstChild(tok)
+                        end
+                    end
+                end
+            end
+            if not cur then return end
+        end
+        result = cur
+    end)
+    if result then return result end
+    pcall(function()
+        local normalized = pathStr:gsub(":GetChildren%(%)", ".GetChildren()")
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj.Name == pathStr or obj:GetFullName():lower():find(pathStr:lower(), 1, true) then
+                result = obj
+                return
+            end
+        end
+    end)
+    return result
+end
+
+local function ParseItemPaths(str)
+    local results = {}
+    local entries = SplitCSV(str)
+    for _, entry in ipairs(entries) do
+        entry = entry:match("^%s*(.-)%s*$")
+        if entry ~= "" then
+            local resolved = ResolvePath(entry)
+            if resolved then
+                table.insert(results, {obj=resolved, isPath=true})
+            else
+                table.insert(results, {name=entry:lower(), isPath=false})
+            end
+        end
+    end
+    return results
+end
+
+local function PassChecks(target)
+    if target == LocalPlayer then return false end
+    local char = target.Character
+    if not char then return false end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return false end
+    if Cfg.AliveOnly and hum.Health <= 0 then return false end
+    if Cfg.RagdollCheck and hum:GetState() == Enum.HumanoidStateType.Physics then return false end
+    if hum.Health < Cfg.MinHealth then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    if (Camera.CFrame.Position - hrp.Position).Magnitude > Cfg.MaxDist then return false end
+    if not PassTeamCheck(target) then return false end
+    if Cfg.WhitelistMode then
+        local found = false
+        for playerName, _ in pairs(SelectedPlayers) do
+            if target.Name == playerName then
+                found = true
+                break
+            end
+        end
+        if not found then return false end
+    end
+    if Cfg.BlacklistMode then
+        local found = false
+        for playerName, _ in pairs(SelectedPlayers) do
+            if target.Name == playerName then
+                found = true
+                break
+            end
+        end
+        if found then return false end
+    end
+    local equipList = SplitCSV(Cfg.EquipBlacklist)
+    if #equipList > 0 then
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool then
+            for _, item in ipairs(equipList) do
+                if item ~= "" and tool.Name:lower():find(item:lower(), 1, true) then return false end
+            end
+        end
+    end
+    local bpList = SplitCSV(Cfg.BackpackBlacklist)
+    if #bpList > 0 then
+        local bp = target:FindFirstChild("Backpack")
+        if bp then
+            for _, tool in ipairs(bp:GetChildren()) do
+                for _, item in ipairs(bpList) do
+                    if item ~= "" and tool.Name:lower():find(item:lower(), 1, true) then return false end
+                end
+            end
+        end
+    end
+    return true
+end
+
+local function ScreenPos(pos)
+    local sp, on = Camera:WorldToViewportPoint(pos)
+    return Vector2.new(sp.X, sp.Y), on
+end
+
+local function GetBounds(char)
+    local mn = Vector3.new(math.huge,math.huge,math.huge)
+    local mx = Vector3.new(-math.huge,-math.huge,-math.huge)
+    for _, p in ipairs(char:GetDescendants()) do
+        if p:IsA("BasePart") then
+            local s, cf = p.Size/2, p.CFrame
+            for _, c in ipairs({
+                Vector3.new( s.X, s.Y, s.Z), Vector3.new(-s.X, s.Y, s.Z),
+                Vector3.new( s.X,-s.Y, s.Z), Vector3.new(-s.X,-s.Y, s.Z),
+                Vector3.new( s.X, s.Y,-s.Z), Vector3.new(-s.X, s.Y,-s.Z),
+                Vector3.new( s.X,-s.Y,-s.Z), Vector3.new(-s.X,-s.Y,-s.Z),
+            }) do
+                local w = cf:PointToWorldSpace(c)
+                mn = Vector3.new(math.min(mn.X,w.X),math.min(mn.Y,w.Y),math.min(mn.Z,w.Z))
+                mx = Vector3.new(math.max(mx.X,w.X),math.max(mx.Y,w.Y),math.max(mx.Z,w.Z))
+            end
+        end
+    end
+    return mn, mx
+end
+
+local function D(t, props)
+    local d = Drawing.new(t)
+    for k,v in pairs(props) do d[k]=v end
+    return d
+end
+
+local BONES = {
+    {"Head","UpperTorso"},{"UpperTorso","LowerTorso"},
+    {"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},
+    {"UpperTorso","RightUpperArm"},{"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"},
+    {"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},
+    {"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"},
+}
+
+local function MakeESP(target)
+    if ESPObjects[target] then return ESPObjects[target] end
+    local hl = Instance.new("SelectionBox")
+    hl.SurfaceTransparency = 0.5
+    hl.LineThickness = 0.05
+    hl.Parent = Workspace
+    local ehl = Instance.new("SelectionBox")
+    ehl.Color3 = Color3.fromRGB(255,255,0)
+    ehl.SurfaceTransparency = 0.6
+    ehl.LineThickness = 0.05
+    ehl.Parent = Workspace
+    local obj = {
+        Hl = hl,
+        Box = D("Square",{Visible=false,Filled=false,Color=Color3.new(1,1,1),Thickness=1}),
+        Skel = {},
+        NameT = D("Text",{Visible=false,Center=true,Outline=true,Size=Cfg.CustomTextSize,Font=FontMap[Cfg.CustomFont] or Drawing.Fonts.UI,Color=Color3.new(1,1,1)}),
+        DistT = D("Text",{Visible=false,Center=true,Outline=true,Size=Cfg.CustomTextSize-1,Font=FontMap[Cfg.CustomFont] or Drawing.Fonts.UI,Color=Color3.new(1,1,1)}),
+        HpBg  = D("Square",{Visible=false,Filled=true,Color=Color3.new(0,0,0),Transparency=0.5}),
+        HpBar = D("Square",{Visible=false,Filled=true,Color=Color3.new(0,1,0)}),
+        HpNum = D("Text",{Visible=false,Center=true,Outline=true,Size=Cfg.CustomTextSize-3,Font=FontMap[Cfg.CustomFont] or Drawing.Fonts.UI,Color=Color3.new(1,1,1)}),
+        EquipT = D("Text",{Visible=false,Center=true,Outline=true,Size=Cfg.CustomTextSize-1,Font=FontMap[Cfg.CustomFont] or Drawing.Fonts.UI,Color=Color3.new(1,1,0)}),
+        EquipHl = ehl,
+        Tracer = D("Line",{Visible=false,Color=Color3.new(1,1,1),Thickness=1}),
+    }
+    ESPObjects[target] = obj
+    return obj
+end
+
+local function UpdateAllESPTexts()
+    for target, obj in pairs(ESPObjects) do
+        if obj then
+            if obj.NameT then
+                obj.NameT.Size = Cfg.CustomTextSize
+                obj.NameT.Font = FontMap[Cfg.CustomFont] or Drawing.Fonts.UI
+            end
+            if obj.DistT then
+                obj.DistT.Size = Cfg.CustomTextSize - 1
+                obj.DistT.Font = FontMap[Cfg.CustomFont] or Drawing.Fonts.UI
+            end
+            if obj.HpNum then
+                obj.HpNum.Size = Cfg.CustomTextSize - 3
+                obj.HpNum.Font = FontMap[Cfg.CustomFont] or Drawing.Fonts.UI
+            end
+            if obj.EquipT then
+                obj.EquipT.Size = Cfg.CustomTextSize - 1
+                obj.EquipT.Font = FontMap[Cfg.CustomFont] or Drawing.Fonts.UI
+            end
+        end
+    end
+end
+
+local function HideESP(obj)
+    obj.Box.Visible = false
+    obj.Hl.Adornee = nil
+    for _, l in ipairs(obj.Skel) do l.Visible = false end
+    obj.NameT.Visible  = false
+    obj.DistT.Visible  = false
+    obj.HpBg.Visible   = false
+    obj.HpBar.Visible  = false
+    obj.HpNum.Visible  = false
+    obj.EquipT.Visible = false
+    obj.EquipHl.Adornee = nil
+    obj.Tracer.Visible = false
+end
+
+local function DestroyESP(target)
+    local obj = ESPObjects[target]
+    if not obj then return end
+    for _, d in ipairs({obj.Box,obj.NameT,obj.DistT,obj.HpBg,obj.HpBar,obj.HpNum,obj.EquipT,obj.Tracer}) do
+        pcall(function() d:Remove() end)
+    end
+    for _, l in ipairs(obj.Skel) do pcall(function() l:Remove() end) end
+    pcall(function() obj.Hl:Destroy() end)
+    pcall(function() obj.EquipHl:Destroy() end)
+    ESPObjects[target] = nil
+end
+
+local function InFOV(sp)
+    if not Cfg.FOVEnabled or not Cfg.FOVOnly then return true end
+    local vp = Camera.ViewportSize
+    local center = Vector2.new(vp.X/2, vp.Y/2)
+    local diff = sp - center
+    if Cfg.FOVShape == "圆形" then return diff.Magnitude <= Cfg.FOVSize end
+    return math.abs(diff.X) <= Cfg.FOVSize and math.abs(diff.Y) <= Cfg.FOVSize
+end
+
+local function GetSortedPlayers()
+    local list = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            if hrp and hum then
+                local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
+                table.insert(list, {player=p, dist=dist, hp=hum.Health, tool=p.Character:FindFirstChildOfClass("Tool")~=nil})
+            end
+        end
+    end
+    local pr = Cfg.Priority
+    table.sort(list, function(a,b)
+        if pr == "低血量优先" then return a.hp < b.hp
+        elseif pr == "高血量优先" then return a.hp > b.hp
+        elseif pr == "持有武器优先" then
+            if a.tool ~= b.tool then return a.tool end
+            return a.dist < b.dist
+        end
+        return a.dist < b.dist
+    end)
+    return list
+end
+
+local FOVCircle = D("Circle",{Visible=false,Filled=false,Color=Color3.new(1,1,1),Thickness=1,NumSides=64})
+local FOVSquare = D("Square",{Visible=false,Filled=false,Color=Color3.new(1,1,1),Thickness=1})
+
+local RadarGui = Instance.new("ScreenGui")
+RadarGui.Name = "JentzRadar"
+RadarGui.ResetOnSpawn = false
+RadarGui.IgnoreGuiInset = true
+RadarGui.Parent = PlayerGui
+
+local RadarBg = Instance.new("Frame")
+RadarBg.Size = UDim2.fromOffset(130,130)
+RadarBg.Position = UDim2.new(1,-140,0,10)
+RadarBg.BackgroundColor3 = Color3.new(0,0,0)
+RadarBg.BackgroundTransparency = 0.4
+RadarBg.BorderSizePixel = 0
+RadarBg.Visible = false
+RadarBg.Parent = RadarGui
+
+local RadarSelf = Instance.new("Frame")
+RadarSelf.Size = UDim2.fromOffset(6,6)
+RadarSelf.Position = UDim2.new(0.5,-3,0.5,-3)
+RadarSelf.BackgroundColor3 = Color3.new(0,1,0)
+RadarSelf.BorderSizePixel = 0
+RadarSelf.Parent = RadarBg
+
+local RadarDots = {}
+
+local parsedItemList = {}
+local lastItemStr = ""
+
+RunService.RenderStepped:Connect(function()
+    RainbowHue = (RainbowHue + 0.005) % 1
+    local rc = Color3.fromHSV(RainbowHue, 1, 1)
+
+    FOVCircle.Visible = false
+    FOVSquare.Visible = false
+    RadarBg.Visible = Cfg.Enabled and Cfg.Radar
+    ItemESPGui.Enabled = Cfg.Enabled and Cfg.BackpackESP
+    StatsGui.Enabled = Cfg.Enabled and Cfg.StatsDisplay
+
+    if Cfg.StatsDisplay then
+        UpdateGameTeams()
+        local total = #Players:GetPlayers()
+        local teamText = "队伍: "
+        if #GameTeams > 0 then
+            local parts = {}
+            for _, team in ipairs(GameTeams) do
+                local cnt = 0
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p.Team == team then cnt = cnt + 1 end
+                end
+                table.insert(parts, team.Name..":"..cnt)
+            end
+            teamText = teamText .. table.concat(parts, " | ")
+        else
+            teamText = teamText .. "无队伍"
+        end
+        local ec = 0
+        for t in pairs(ESPObjects) do if t and t.Character then ec = ec + 1 end end
+        PlayerCountLabel.Text = "在线: " .. total
+        TeamCountLabel.Text   = teamText
+        ESPCountLabel.Text    = "透视: " .. ec
+    end
+
+    if not Cfg.Enabled then
+        for _, obj in pairs(ESPObjects) do HideESP(obj) end
+        for _, obj in pairs(NpcObjects) do pcall(function() obj.Hl.Adornee = nil end) end
+        for _, obj in pairs(ItemObjects) do pcall(function() obj.Hl.Adornee = nil end) end
+        for _, obj in pairs(InteractiveObjects) do 
+            if obj.Hl then pcall(function() obj.Hl.Adornee = nil end) end
+            if obj.Text then obj.Text.Visible = false end
+        end
+        for _, obj in pairs(VehicleObjects) do
+            if obj.Hl then pcall(function() obj.Hl.Adornee = nil end) end
+            if obj.NameT then obj.NameT.Visible = false end
+            if obj.DistT then obj.DistT.Visible = false end
+        end
+        for _, dot in pairs(RadarDots) do dot.Visible = false end
+        for _, trail in ipairs(BulletTrails) do pcall(function() trail:Remove() end) end
+        BulletTrails = {}
+        return
+    end
+
+    if Cfg.FOVEnabled then
+        local vp = Camera.ViewportSize
+        local cx, cy = vp.X/2, vp.Y/2
+        local fc = Cfg.FOVRainbow and rc or Cfg.FOVColor
+        if Cfg.FOVShape == "圆形" then
+            FOVCircle.Position = Vector2.new(cx, cy)
+            FOVCircle.Radius = Cfg.FOVSize
+            FOVCircle.Color = fc
+            FOVCircle.Visible = true
+        else
+            FOVSquare.Position = Vector2.new(cx-Cfg.FOVSize, cy-Cfg.FOVSize)
+            FOVSquare.Size = Vector2.new(Cfg.FOVSize*2, Cfg.FOVSize*2)
+            FOVSquare.Color = fc
+            FOVSquare.Visible = true
+        end
+    end
+
+    local sorted = GetSortedPlayers()
+    local seen = {}
+
+    for _, entry in ipairs(sorted) do
+        local target = entry.player
+        seen[target] = true
+        local char = target.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not char or not hum or not hrp then
+            if ESPObjects[target] then HideESP(ESPObjects[target]) end
+            continue
+        end
+
+        local obj = MakeESP(target)
+        local passes = PassChecks(target) and IsVisible(char)
+        local headSP, headOn = ScreenPos(hrp.Position + Vector3.new(0,3.5,0))
+        local footSP = ScreenPos(hrp.Position - Vector3.new(0,3,0))
+        local centerSP = ScreenPos(hrp.Position)
+
+        if not passes or not InFOV(centerSP) then
+            HideESP(obj)
+            continue
+        end
+
+        local mn3, mx3 = GetBounds(char)
+        local minSP = Vector2.new(math.huge,math.huge)
+        local maxSP = Vector2.new(-math.huge,-math.huge)
+        for _, c in ipairs({
+            Vector3.new(mn3.X,mn3.Y,mn3.Z), Vector3.new(mx3.X,mn3.Y,mn3.Z),
+            Vector3.new(mn3.X,mx3.Y,mn3.Z), Vector3.new(mx3.X,mx3.Y,mn3.Z),
+            Vector3.new(mn3.X,mn3.Y,mx3.Z), Vector3.new(mx3.X,mn3.Y,mx3.Z),
+            Vector3.new(mn3.X,mx3.Y,mx3.Z), Vector3.new(mx3.X,mx3.Y,mx3.Z),
+        }) do
+            local s2 = ScreenPos(c)
+            minSP = Vector2.new(math.min(minSP.X,s2.X), math.min(minSP.Y,s2.Y))
+            maxSP = Vector2.new(math.max(maxSP.X,s2.X), math.max(maxSP.Y,s2.Y))
+        end
+        local boxPos = minSP
+        local boxSz  = maxSP - minSP
+
+        if Cfg.Box2D then
+            obj.Box.Position  = boxPos
+            obj.Box.Size      = boxSz
+            obj.Box.Color     = Cfg.Box2DRainbow and rc or Cfg.Box2DColor
+            obj.Box.Thickness = Cfg.Box2DThick
+            obj.Box.Visible   = headOn
+        else obj.Box.Visible = false end
+
+        if Cfg.Box3D then
+            obj.Hl.Adornee          = char
+            obj.Hl.Color3           = Cfg.Box3DRainbow and rc or Cfg.Box3DColor
+            obj.Hl.SurfaceTransparency = 1
+        elseif Cfg.Highlight then
+            obj.Hl.Adornee          = char
+            obj.Hl.Color3           = Cfg.HighlightRainbow and rc or Cfg.HighlightColor
+            obj.Hl.SurfaceTransparency = 0.5
+        else
+            obj.Hl.Adornee = nil
+        end
+
+        if Cfg.Skeleton then
+            local sc = Cfg.SkeletonRainbow and rc or Cfg.SkeletonColor
+            for i, pair in ipairs(BONES) do
+                if not obj.Skel[i] then
+                    obj.Skel[i] = D("Line",{Visible=false,Thickness=1,Color=Color3.new(1,1,1)})
+                end
+                local a = char:FindFirstChild(pair[1])
+                local b = char:FindFirstChild(pair[2])
+                if a and b then
+                    local p1, o1 = ScreenPos(a.Position)
+                    local p2, o2 = ScreenPos(b.Position)
+                    obj.Skel[i].From    = p1
+                    obj.Skel[i].To      = p2
+                    obj.Skel[i].Color   = sc
+                    obj.Skel[i].Visible = o1 and o2
+                else obj.Skel[i].Visible = false end
+            end
+        else
+            for _, l in ipairs(obj.Skel) do l.Visible = false end
+        end
+
+        local textOffsetY = headSP.Y - 16
+        if Cfg.NameEnabled then
+            local n = Cfg.NameMode == "显示名" and target.DisplayName
+                or Cfg.NameMode == "两者" and (target.Name.." ("..target.DisplayName..")")
+                or target.Name
+            local nameText = Cfg.CustomNameTemplate:gsub("{name}", n)
+            obj.NameT.Text     = nameText
+            obj.NameT.Position = Vector2.new(headSP.X, textOffsetY)
+            obj.NameT.Color    = Cfg.NameRainbow and rc or Cfg.NameColor
+            obj.NameT.Visible  = headOn
+            textOffsetY = textOffsetY - Cfg.CustomTextSize - 2
+        else obj.NameT.Visible = false end
+
+        if Cfg.EquipDisplay then
+            local tool = char:FindFirstChildOfClass("Tool")
+            if tool then
+                obj.EquipT.Text     = "["..tool.Name.."]"
+                obj.EquipT.Position = Vector2.new(headSP.X, textOffsetY)
+                obj.EquipT.Visible  = headOn
+                obj.EquipHl.Adornee = tool:FindFirstChildOfClass("BasePart") or tool:FindFirstChildWhichIsA("BasePart",true)
+            else
+                obj.EquipT.Visible  = false
+                obj.EquipHl.Adornee = nil
+            end
+        else
+            obj.EquipT.Visible  = false
+            obj.EquipHl.Adornee = nil
+        end
+
+        if Cfg.DistEnabled then
+            local distText = Cfg.CustomDistTemplate:gsub("{dist}", math.floor(entry.dist))
+            obj.DistT.Text     = distText
+            obj.DistT.Color    = Cfg.DistRainbow and rc or Cfg.DistColor
+            obj.DistT.Position = footSP + Vector2.new(0,4)
+            obj.DistT.Visible  = headOn
+        else obj.DistT.Visible = false end
+
+        if Cfg.HealthBar then
+            local ratio = math.clamp(hum.Health / math.max(hum.MaxHealth,1), 0, 1)
+            local bh = math.abs(footSP.Y - headSP.Y)
+            if Cfg.HealthBarPos == "顶部" then
+                obj.HpBg.Position  = Vector2.new(boxPos.X, headSP.Y - 6)
+                obj.HpBg.Size      = Vector2.new(boxSz.X, 4)
+                obj.HpBg.Visible   = headOn
+                obj.HpBar.Position = Vector2.new(boxPos.X, headSP.Y - 6)
+                obj.HpBar.Size     = Vector2.new(boxSz.X * ratio, 4)
+                obj.HpBar.Color    = Color3.fromHSV(ratio*0.35, 1, 1)
+                obj.HpBar.Visible  = headOn
+                if Cfg.HealthNumeric then
+                    local healthText = Cfg.CustomHealthTemplate:gsub("{health}", math.floor(hum.Health)):gsub("{max}", math.floor(hum.MaxHealth))
+                    obj.HpNum.Text     = healthText
+                    obj.HpNum.Position = Vector2.new(boxPos.X + boxSz.X/2, headSP.Y - 18)
+                    obj.HpNum.Visible  = headOn
+                else obj.HpNum.Visible = false end
+            else
+                local bx = Cfg.HealthBarPos == "右边" and (boxPos.X + boxSz.X + 4) or (boxPos.X - 8)
+                obj.HpBg.Position  = Vector2.new(bx, headSP.Y)
+                obj.HpBg.Size      = Vector2.new(5, bh)
+                obj.HpBg.Visible   = headOn
+                obj.HpBar.Position = Vector2.new(bx, headSP.Y + bh*(1-ratio))
+                obj.HpBar.Size     = Vector2.new(5, bh*ratio)
+                obj.HpBar.Color    = Color3.fromHSV(ratio*0.35, 1, 1)
+                obj.HpBar.Visible  = headOn
+                if Cfg.HealthNumeric then
+                    local healthText = Cfg.CustomHealthTemplate:gsub("{health}", math.floor(hum.Health)):gsub("{max}", math.floor(hum.MaxHealth))
+                    obj.HpNum.Text     = healthText
+                    obj.HpNum.Position = Vector2.new(bx+7, headSP.Y+bh/2-6)
+                    obj.HpNum.Visible  = headOn
+                else obj.HpNum.Visible = false end
+            end
+        else
+            obj.HpBg.Visible  = false
+            obj.HpBar.Visible = false
+            obj.HpNum.Visible = false
+        end
+
+        if Cfg.Tracer then
+            local vp = Camera.ViewportSize
+            local orig = Cfg.TracerOrigin == "底部" and Vector2.new(vp.X/2, vp.Y)
+                or Cfg.TracerOrigin == "鼠标" and UserInputService:GetMouseLocation()
+                or Vector2.new(vp.X/2, vp.Y/2)
+            obj.Tracer.From    = orig
+            obj.Tracer.To      = footSP
+            obj.Tracer.Color   = Cfg.TracerRainbow and rc or Cfg.TracerColor
+            obj.Tracer.Visible = headOn
+        else obj.Tracer.Visible = false end
+
+        if Cfg.Radar then
+            local myHrp = Root()
+            if myHrp then
+                if not RadarDots[target] then
+                    local dot = Instance.new("Frame")
+                    dot.Size = UDim2.fromOffset(5,5)
+                    dot.BackgroundColor3 = Color3.new(1,0,0)
+                    dot.BorderSizePixel = 0
+                    dot.Parent = RadarBg
+                    RadarDots[target] = dot
+                end
+                local rel = hrp.Position - myHrp.Position
+                local s = 65 / Cfg.MaxDist
+                RadarDots[target].Position = UDim2.fromOffset(
+                    math.clamp(rel.X*s+65, 0, 125),
+                    math.clamp(-rel.Z*s+65, 0, 125)
+                )
+                RadarDots[target].Visible = true
+            end
+        else
+            if RadarDots[target] then RadarDots[target].Visible = false end
+        end
+    end
+
+    for target, obj in pairs(ESPObjects) do
+        if not seen[target] then HideESP(obj) end
+    end
+
+    if Cfg.NpcESP then
+        local found = {}
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("Humanoid") then
+                local ch = obj.Parent
+                if ch and not Players:GetPlayerFromCharacter(ch) then
+                    found[ch] = true
+                    if not NpcObjects[ch] then
+                        local hl = Instance.new("SelectionBox")
+                        hl.Color3 = Color3.fromRGB(255,165,0)
+                        hl.SurfaceTransparency = 0.5
+                        hl.LineThickness = 0.05
+                        hl.Parent = Workspace
+                        NpcObjects[ch] = {Hl=hl}
+                    end
+                    NpcObjects[ch].Hl.Adornee = ch
+                end
+            end
+        end
+        for ch, obj in pairs(NpcObjects) do
+            if not found[ch] then
+                obj.Hl.Adornee = nil
+                obj.Hl:Destroy()
+                NpcObjects[ch] = nil
+            end
+        end
+    else
+        for _, obj in pairs(NpcObjects) do obj.Hl.Adornee = nil end
+    end
+
+    if Cfg.ItemESP and Cfg.ItemPaths ~= "" then
+        if Cfg.ItemPaths ~= lastItemStr then
+            lastItemStr = Cfg.ItemPaths
+            parsedItemList = ParseItemPaths(Cfg.ItemPaths)
+        end
+        local found = {}
+        for _, entry in ipairs(parsedItemList) do
+            if entry.isPath and entry.obj then
+                local obj = entry.obj
+                local ok, valid = pcall(function() return obj.Parent ~= nil end)
+                if ok and valid then
+                    found[obj] = true
+                    if not ItemObjects[obj] then
+                        local hl = Instance.new("SelectionBox")
+                        hl.Color3 = Color3.fromRGB(0,255,100)
+                        hl.SurfaceTransparency = 0.5
+                        hl.LineThickness = 0.05
+                        hl.Parent = Workspace
+                        ItemObjects[obj] = {Hl=hl}
+                    end
+                    ItemObjects[obj].Hl.Adornee = obj
+                end
+            else
+                for _, wsObj in ipairs(Workspace:GetDescendants()) do
+                    if (wsObj:IsA("Model") or wsObj:IsA("BasePart") or wsObj:IsA("Tool")) then
+                        if wsObj.Name:lower():find(entry.name, 1, true) then
+                            found[wsObj] = true
+                            if not ItemObjects[wsObj] then
+                                local hl = Instance.new("SelectionBox")
+                                hl.Color3 = Color3.fromRGB(0,255,100)
+                                hl.SurfaceTransparency = 0.5
+                                hl.LineThickness = 0.05
+                                hl.Parent = Workspace
+                                ItemObjects[wsObj] = {Hl=hl}
+                            end
+                            ItemObjects[wsObj].Hl.Adornee = wsObj
+                        end
+                    end
+                end
+            end
+        end
+        for obj, data in pairs(ItemObjects) do
+            if not found[obj] then
+                data.Hl.Adornee = nil
+                data.Hl:Destroy()
+                ItemObjects[obj] = nil
+            end
+        end
+    else
+        for _, data in pairs(ItemObjects) do data.Hl.Adornee = nil end
+        parsedItemList = {}
+        lastItemStr = ""
+    end
+
+    if Cfg.InteractiveESP then
+        for _, obj in pairs(InteractiveObjects) do
+            if obj.Hl then pcall(function() obj.Hl.Adornee = nil end) end
+            if obj.Text then obj.Text.Visible = false end
+        end
+        InteractiveObjects = {}
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("Model") or obj:IsA("BasePart") then
+                local isInteractive = false
+                local interactType = ""
+                if obj:FindFirstChild("ClickDetector") then 
+                    isInteractive = true
+                    interactType = "点击"
+                end
+                if obj:FindFirstChild("ProximityPrompt") then 
+                    isInteractive = true
+                    interactType = "靠近"
+                end
+                if obj:FindFirstChild("TouchTransmitter") then 
+                    isInteractive = true
+                    interactType = "触摸"
+                end
+                if obj.Name:lower():find("button") then
+                    isInteractive = true
+                    interactType = "按钮"
+                elseif obj.Name:lower():find("switch") then
+                    isInteractive = true
+                    interactType = "开关"
+                elseif obj.Name:lower():find("lever") then
+                    isInteractive = true
+                    interactType = "拉杆"
+                elseif obj.Name:lower():find("door") then
+                    isInteractive = true
+                    interactType = "门"
+                elseif obj.Name:lower():find("chest") or obj.Name:lower():find("箱子") then
+                    isInteractive = true
+                    interactType = "箱子"
+                end
+                if isInteractive then
+                    local anchor = obj:IsA("BasePart") and obj or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+                    if anchor then
+                        local pos, on = Camera:WorldToViewportPoint(anchor.Position)
+                        if on then
+                            if not InteractiveObjects[obj] then
+                                local text = D("Text",{Visible=false,Center=true,Outline=true,Size=13,Font=Drawing.Fonts.UI,Color=Cfg.InteractiveColor})
+                                InteractiveObjects[obj] = {Text=text}
+                            end
+                            local displayText = "[互动] " .. obj.Name
+                            if interactType ~= "" then
+                                displayText = "[" .. interactType .. "] " .. obj.Name
+                            end
+                            InteractiveObjects[obj].Text.Text = displayText
+                            InteractiveObjects[obj].Text.Position = Vector2.new(pos.X, pos.Y - 20)
+                            InteractiveObjects[obj].Text.Visible = true
+                        end
+                    end
+                end
+            end
+        end
+    else
+        for _, obj in pairs(InteractiveObjects) do
+            if obj.Text then obj.Text.Visible = false end
+        end
+    end
+
+    if Cfg.BackpackESP then
+        ItemESPGui:ClearAllChildren()
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player == LocalPlayer then continue end
+            local character = player.Character
+            if not character then continue end
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if not hrp then continue end
+            local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(3,2,0))
+            if not onScreen then continue end
+            local items = {}
+            for _, obj in ipairs(character:GetChildren()) do
+                if obj:IsA("Tool") then
+                    table.insert(items, {name="[手持] "..obj.Name, equipped=true})
+                end
+            end
+            local bp = player:FindFirstChild("Backpack")
+            if bp then
+                for _, item in ipairs(bp:GetChildren()) do
+                    if item:IsA("Tool") then
+                        table.insert(items, {name=item.Name, equipped=false})
+                    end
+                end
+            end
+            if #items == 0 then continue end
+            local container = Instance.new("Frame")
+            container.Size = UDim2.new(0,160,0,0)
+            container.Position = UDim2.new(0,pos.X,0,pos.Y)
+            container.BackgroundTransparency = 1
+            container.Parent = ItemESPGui
+            local layout = Instance.new("UIListLayout")
+            layout.Padding = UDim.new(0,2)
+            layout.Parent = container
+            for _, itemData in ipairs(items) do
+                local label = Instance.new("TextLabel")
+                label.Size = UDim2.new(1,0,0,13)
+                label.BackgroundTransparency = 1
+                label.Font = Enum.Font.SourceSansBold
+                label.TextSize = 12
+                label.TextColor3 = itemData.equipped and Color3.new(1,0.3,0.3) or Color3.new(1,1,1)
+                label.TextStrokeTransparency = 0
+                label.Text = itemData.name
+                label.TextXAlignment = Enum.TextXAlignment.Left
+                label.Parent = container
+            end
+        end
+    end
+
+    if Cfg.VehicleESP then
+        local foundV = {}
+        local seen2D = {}
+        for _, vehicle in ipairs(Workspace:GetDescendants()) do
+            if vehicle:IsA("Model") then
+                local seat = vehicle:FindFirstChildOfClass("VehicleSeat")
+                if not seat then continue end
+                local anchor = vehicle.PrimaryPart or seat
+                local vPos3, vOn = Camera:WorldToViewportPoint(anchor.Position)
+                if not vOn then continue end
+                local vPos = Vector2.new(vPos3.X, vPos3.Y)
+                local tooClose = false
+                for _, prev in ipairs(seen2D) do
+                    if (vPos - prev).Magnitude < 80 then tooClose = true; break end
+                end
+                if tooClose then continue end
+                table.insert(seen2D, vPos)
+                foundV[vehicle] = true
+                if not VehicleObjects[vehicle] then
+                    local hl = Instance.new("SelectionBox")
+                    hl.Color3 = Color3.fromRGB(0,255,255)
+                    hl.SurfaceTransparency = 0.5
+                    hl.LineThickness = 0.05
+                    hl.Parent = Workspace
+                    local nameT = D("Text",{Visible=false,Center=true,Outline=true,Size=13,Font=Drawing.Fonts.UI,Color=Color3.new(0,1,1)})
+                    VehicleObjects[vehicle] = {Hl=hl, NameT=nameT}
+                end
+                local vobj = VehicleObjects[vehicle]
+                vobj.Hl.Adornee = vehicle
+
+                vobj.NameT.Text     = vehicle.Name
+                vobj.NameT.Position = Vector2.new(vPos.X, vPos.Y - 16)
+                vobj.NameT.Visible  = true
+            end
+        end
+        for vehicle, vobj in pairs(VehicleObjects) do
+            if not foundV[vehicle] then
+                pcall(function() vobj.Hl.Adornee = nil; vobj.Hl:Destroy() end)
+                pcall(function() vobj.NameT:Remove() end)
+                VehicleObjects[vehicle] = nil
+            end
+        end
+    else
+        for _, vobj in pairs(VehicleObjects) do
+            pcall(function() vobj.Hl.Adornee = nil end)
+            if vobj.NameT then vobj.NameT.Visible = false end
+        end
+    end
+
+    if Cfg.BulletTrail then
+        for _, trail in ipairs(BulletTrails) do pcall(function() trail:Remove() end) end
+        BulletTrails = {}
+        for _, bullet in ipairs(Workspace:GetDescendants()) do
+            if bullet:IsA("BasePart") and bullet.Name:lower():find("bullet") and bullet.Velocity.Magnitude > 10 then
+                local a, aOn = ScreenPos(bullet.CFrame.Position - bullet.Velocity.Unit * 5)
+                local b, bOn = ScreenPos(bullet.CFrame.Position)
+                if aOn or bOn then
+                    local trail = D("Line",{Visible=true,From=a,To=b,Color=Cfg.BulletTrailColor,Thickness=Cfg.BulletTrailSize})
+                    table.insert(BulletTrails, trail)
+                end
+            end
+        end
+    else
+        for _, trail in ipairs(BulletTrails) do pcall(function() trail:Remove() end) end
+        BulletTrails = {}
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+    DestroyESP(p)
+    if RadarDots[p] then RadarDots[p]:Destroy(); RadarDots[p]=nil end
+end)
+
+local function RefreshList()
+    PlayerListNames = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then table.insert(PlayerListNames, p.Name) end
+    end
+    if playerMultiDropdown then
+        playerMultiDropdown:SetValues(PlayerListNames)
+    end
+end
+RefreshList()
+Players.PlayerAdded:Connect(function() task.wait(1); RefreshList() end)
+Players.PlayerRemoving:Connect(function() task.wait(0.1); RefreshList() end)
+
+local TabMain     = Window:Tab({Title = "基础控制", Icon = "shield"})
+local TabStyle    = Window:Tab({Title = "显示样式", Icon = "layers"})
+local TabLists    = Window:Tab({Title = "名单管理", Icon = "users"})
+local TabWorld    = Window:Tab({Title = "世界透视", Icon = "globe"})
+local TabPriority = Window:Tab({Title = "优先级",   Icon = "star"})
+local TabCustom   = Window:Tab({Title = "自定义",   Icon = "settings"})
+
+local S1 = TabMain:Section({Title = "ESP 主控", TextXAlignment = "Left"})
+S1:Toggle({Title = "启用 ESP",                  Value = false, Callback = function(v) Cfg.Enabled = v end})
+S1:Toggle({Title = "穿墙检测",                  Value = true,  Callback = function(v) Cfg.WallCheck = v end})
+S1:Toggle({Title = "存活检测 (死亡不透视)",      Value = true,  Callback = function(v) Cfg.AliveOnly = v end})
+S1:Toggle({Title = "布偶检测 (布偶状态不透视)",  Value = false, Callback = function(v) Cfg.RagdollCheck = v end})
+
+local S2 = TabMain:Section({Title = "队伍过滤 (自动检测游戏队伍)", TextXAlignment = "Left"})
+local TeamToggles = {}
+
+local function BuildTeamToggles()
+    UpdateGameTeams()
+    for _, t in ipairs(TeamToggles) do pcall(function() t:Destroy() end) end
+    TeamToggles = {}
+    if #GameTeams > 0 then
+        for _, team in ipairs(GameTeams) do
+            if Cfg.TeamFilters[team.Name] == nil then Cfg.TeamFilters[team.Name] = true end
+            local tname = team.Name
+            local tog = S2:Toggle({
+                Title = "透视: " .. tname,
+                Value = Cfg.TeamFilters[tname],
+                Callback = function(v) Cfg.TeamFilters[tname] = v end
+            })
+            table.insert(TeamToggles, tog)
+        end
+    else
+        local tog = S2:Toggle({Title = "无队伍游戏 (全部透视)", Value = true, Callback = function() end})
+        table.insert(TeamToggles, tog)
+    end
+end
+
+BuildTeamToggles()
+task.spawn(function()
+    while task.wait(8) do BuildTeamToggles() end
+end)
+
+local S3 = TabMain:Section({Title = "血量 与 距离", TextXAlignment = "Left"})
+S3:Slider({Title = "最低血量过滤",    Value = {Min=0,Max=100,Default=0},    Step=1,  Callback = function(v) Cfg.MinHealth = v end})
+S3:Slider({Title = "最大距离 studs", Value = {Min=50,Max=5000,Default=1000}, Step=50, Callback = function(v) Cfg.MaxDist = v end})
+
+local S4 = TabMain:Section({Title = "装备 / 背包 黑名单", TextXAlignment = "Left"})
+S4:Input({Title = "装备黑名单 (逗号分隔)",  Placeholder = "Sword, Gun ...",     Callback = function(v) Cfg.EquipBlacklist = v end})
+S4:Input({Title = "背包黑名单 (逗号分隔)",  Placeholder = "Potion, Shield ...", Callback = function(v) Cfg.BackpackBlacklist = v end})
+
+local B1 = TabStyle:Section({Title = "2D Box", TextXAlignment = "Left"})
+B1:Toggle({Title = "启用 2D Box",    Value = false, Callback = function(v) Cfg.Box2D = v end})
+B1:Dropdown({Title = "2D Box 颜色", Values = ColorNames, Value = "白色", Callback = function(v) Cfg.Box2DColor = ColorMap[v] end})
+B1:Slider({Title = "线条粗细",       Value = {Min=1,Max=5,Default=1}, Step=1, Callback = function(v) Cfg.Box2DThick = v end})
+B1:Toggle({Title = "彩虹模式",       Value = false, Callback = function(v) Cfg.Box2DRainbow = v end})
+
+local B2 = TabStyle:Section({Title = "3D Box", TextXAlignment = "Left"})
+B2:Toggle({Title = "启用 3D Box",    Value = false, Callback = function(v) Cfg.Box3D = v end})
+B2:Dropdown({Title = "3D Box 颜色", Values = ColorNames, Value = "白色", Callback = function(v) Cfg.Box3DColor = ColorMap[v] end})
+B2:Toggle({Title = "彩虹模式",       Value = false, Callback = function(v) Cfg.Box3DRainbow = v end})
+
+local B3 = TabStyle:Section({Title = "高亮", TextXAlignment = "Left"})
+B3:Toggle({Title = "启用高亮",    Value = false, Callback = function(v) Cfg.Highlight = v end})
+B3:Dropdown({Title = "高亮颜色", Values = ColorNames, Value = "红色", Callback = function(v) Cfg.HighlightColor = ColorMap[v] end})
+B3:Toggle({Title = "彩虹模式",    Value = false, Callback = function(v) Cfg.HighlightRainbow = v end})
+
+local B4 = TabStyle:Section({Title = "骨骼透视", TextXAlignment = "Left"})
+B4:Toggle({Title = "启用骨骼透视", Value = false, Callback = function(v) Cfg.Skeleton = v end})
+B4:Dropdown({Title = "骨骼颜色",   Values = ColorNames, Value = "白色", Callback = function(v) Cfg.SkeletonColor = ColorMap[v] end})
+B4:Toggle({Title = "彩虹模式",     Value = false, Callback = function(v) Cfg.SkeletonRainbow = v end})
+
+local B5 = TabStyle:Section({Title = "名字显示", TextXAlignment = "Left"})
+B5:Toggle({Title = "启用名字显示", Value = false, Callback = function(v) Cfg.NameEnabled = v end})
+B5:Dropdown({Title = "名字模式",   Values = {"名字","显示名","两者"}, Value = "名字", Callback = function(v) Cfg.NameMode = v end})
+B5:Dropdown({Title = "名字颜色",   Values = ColorNames, Value = "白色", Callback = function(v) Cfg.NameColor = ColorMap[v] end})
+B5:Toggle({Title = "彩虹模式",     Value = false, Callback = function(v) Cfg.NameRainbow = v end})
+
+local B6 = TabStyle:Section({Title = "距离显示", TextXAlignment = "Left"})
+B6:Toggle({Title = "启用距离显示", Value = false, Callback = function(v) Cfg.DistEnabled = v end})
+B6:Dropdown({Title = "距离颜色",   Values = ColorNames, Value = "白色", Callback = function(v) Cfg.DistColor = ColorMap[v] end})
+B6:Toggle({Title = "彩虹模式",     Value = false, Callback = function(v) Cfg.DistRainbow = v end})
+
+local B7 = TabStyle:Section({Title = "血量条", TextXAlignment = "Left"})
+B7:Toggle({Title = "启用血量条",   Value = false, Callback = function(v) Cfg.HealthBar = v end})
+B7:Dropdown({Title = "血量条位置", Values = {"左边","右边","顶部"}, Value = "左边", Callback = function(v) Cfg.HealthBarPos = v end})
+B7:Toggle({Title = "显示数字血量", Value = false, Callback = function(v) Cfg.HealthNumeric = v end})
+
+local B8 = TabStyle:Section({Title = "装备显示", TextXAlignment = "Left"})
+B8:Toggle({Title = "启用装备显示 (名字 + 高亮)", Value = false, Callback = function(v) Cfg.EquipDisplay = v end})
+
+local B9 = TabStyle:Section({Title = "Tracer 连线", TextXAlignment = "Left"})
+B9:Toggle({Title = "启用 Tracer",  Value = false, Callback = function(v) Cfg.Tracer = v end})
+B9:Dropdown({Title = "连线起点",   Values = {"底部","鼠标","中心"}, Value = "底部", Callback = function(v) Cfg.TracerOrigin = v end})
+B9:Dropdown({Title = "连线颜色",   Values = ColorNames, Value = "白色", Callback = function(v) Cfg.TracerColor = ColorMap[v] end})
+B9:Toggle({Title = "彩虹模式",     Value = false, Callback = function(v) Cfg.TracerRainbow = v end})
+
+local B10 = TabStyle:Section({Title = "FOV 圈", TextXAlignment = "Left"})
+B10:Toggle({Title = "启用 FOV 圈",       Value = false, Callback = function(v) Cfg.FOVEnabled = v end})
+B10:Toggle({Title = "仅 FOV 内才透视",   Value = false, Callback = function(v) Cfg.FOVOnly = v end})
+B10:Slider({Title = "FOV 大小",          Value = {Min=50,Max=500,Default=150}, Step=10, Callback = function(v) Cfg.FOVSize = v end})
+B10:Dropdown({Title = "FOV 颜色",        Values = ColorNames, Value = "白色", Callback = function(v) Cfg.FOVColor = ColorMap[v] end})
+B10:Toggle({Title = "FOV 彩虹模式",      Value = false, Callback = function(v) Cfg.FOVRainbow = v end})
+B10:Dropdown({Title = "FOV 形状",        Values = {"圆形","方形"}, Value = "圆形", Callback = function(v) Cfg.FOVShape = v end})
+
+local B11 = TabStyle:Section({Title = "雷达 (右上角)", TextXAlignment = "Left"})
+B11:Toggle({Title = "启用雷达小地图", Value = false, Callback = function(v) Cfg.Radar = v end})
+
+local B12 = TabStyle:Section({Title = "子弹轨迹", TextXAlignment = "Left"})
+B12:Toggle({Title = "启用子弹轨迹",  Value = false, Callback = function(v) Cfg.BulletTrail = v end})
+B12:Dropdown({Title = "轨迹颜色",    Values = ColorNames, Value = "红色", Callback = function(v) Cfg.BulletTrailColor = ColorMap[v] end})
+B12:Slider({Title = "轨迹粗细",      Value = {Min=1,Max=5,Default=1}, Step=1, Callback = function(v) Cfg.BulletTrailSize = v end})
+
+local B13 = TabStyle:Section({Title = "载具透视", TextXAlignment = "Left"})
+B13:Toggle({Title = "启用载具透视", Value = false, Callback = function(v) Cfg.VehicleESP = v end})
+
+local B14 = TabStyle:Section({Title = "统计显示", TextXAlignment = "Left"})
+B14:Toggle({Title = "启用统计显示", Value = false, Callback = function(v) Cfg.StatsDisplay = v end})
+
+local L1 = TabLists:Section({Title = "名单管理", TextXAlignment = "Left"})
+L1:Toggle({Title = "启用白名单模式 (仅透视选中玩家)", Value = false, Callback = function(v) Cfg.WhitelistMode = v end})
+L1:Toggle({Title = "启用黑名单模式 (不透视选中玩家)", Value = false, Callback = function(v) Cfg.BlacklistMode = v end})
+
+local playerMultiDropdown
+playerMultiDropdown = L1:Dropdown({
+    Title = "选择玩家 (多选)",
+    Values = PlayerListNames,
+    Value = {},
+    Multi = true,
+    Callback = function(v)
+        SelectedPlayers = {}
+        for _, playerName in ipairs(v) do
+            SelectedPlayers[playerName] = true
+        end
+    end
+})
+
+L1:Button({Title = "添加到白名单", Callback = function()
+    for playerName, _ in pairs(SelectedPlayers) do
+        Cfg.Whitelist[playerName] = true
+    end
+    Window:Notify({Title = "名单管理", Content = "已添加到白名单", Duration = 2})
+end})
+
+L1:Button({Title = "添加到黑名单", Callback = function()
+    for playerName, _ in pairs(SelectedPlayers) do
+        Cfg.Blacklist[playerName] = true
+    end
+    Window:Notify({Title = "名单管理", Content = "已添加到黑名单", Duration = 2})
+end})
+
+L1:Button({Title = "从白名单移除", Callback = function()
+    for playerName, _ in pairs(SelectedPlayers) do
+        Cfg.Whitelist[playerName] = nil
+    end
+    Window:Notify({Title = "名单管理", Content = "已从白名单移除", Duration = 2})
+end})
+
+L1:Button({Title = "从黑名单移除", Callback = function()
+    for playerName, _ in pairs(SelectedPlayers) do
+        Cfg.Blacklist[playerName] = nil
+    end
+    Window:Notify({Title = "名单管理", Content = "已从黑名单移除", Duration = 2})
+end})
+
+L1:Button({Title = "清空白名单", Callback = function() Cfg.Whitelist = {} end})
+L1:Button({Title = "清空黑名单", Callback = function() Cfg.Blacklist = {} end})
+
+local W1 = TabWorld:Section({Title = "NPC 透视", TextXAlignment = "Left"})
+W1:Toggle({Title = "启用 NPC 透视 (全部NPC)", Value = false, Callback = function(v) Cfg.NpcESP = v end})
+
+local W2 = TabWorld:Section({Title = "物品透视", TextXAlignment = "Left"})
+W2:Toggle({Title = "启用物品透视", Value = false, Callback = function(v)
+    Cfg.ItemESP = v
+    if not v then
+        for _, data in pairs(ItemObjects) do pcall(function() data.Hl.Adornee = nil; data.Hl:Destroy() end) end
+        ItemObjects = {}
+        parsedItemList = {}
+        lastItemStr = ""
+    end
+end})
+W2:Input({
+    Title = "物品路径/名称 (逗号分隔)",
+    Placeholder = "workspace.Map.Chest, Apple",
+    Callback = function(v)
+        Cfg.ItemPaths = v
+        parsedItemList = {}
+        lastItemStr = ""
+    end
+})
+
+local W3 = TabWorld:Section({Title = "背包透视", TextXAlignment = "Left"})
+W3:Toggle({Title = "启用背包透视 (玩家背包内容)", Value = false, Callback = function(v) Cfg.BackpackESP = v end})
+
+local W4 = TabWorld:Section({Title = "互动透视", TextXAlignment = "Left"})
+W4:Toggle({Title = "启用互动透视", Value = false, Callback = function(v) Cfg.InteractiveESP = v end})
+W4:Dropdown({Title = "互动颜色", Values = ColorNames, Value = "青色", Callback = function(v) Cfg.InteractiveColor = ColorMap[v] end})
+
+local P1 = TabPriority:Section({Title = "排序优先级", TextXAlignment = "Left"})
+P1:Dropdown({
+    Title = "ESP 优先模式",
+    Values = {"距离","低血量优先","高血量优先","持有武器优先"},
+    Value = "距离",
+    Callback = function(v) Cfg.Priority = v end
+})
+
+local C1 = TabCustom:Section({Title = "文字模板", TextXAlignment = "Left"})
+C1:Slider({Title = "文字大小", Value = {Min=10,Max=30,Default=14}, Step=1, Callback = function(v) 
+    Cfg.CustomTextSize = v
+    UpdateAllESPTexts()
+end})
+C1:Dropdown({Title = "字体风格", Values = FontNames, Value = "UI", Callback = function(v) 
+    Cfg.CustomFont = v
+    UpdateAllESPTexts()
+end})
+C1:Input({Title = "名字模板", Placeholder = "{name}", Value = "{name}", Callback = function(v) Cfg.CustomNameTemplate = v end})
+C1:Input({Title = "距离模板", Placeholder = "{dist}m", Value = "{dist}m", Callback = function(v) Cfg.CustomDistTemplate = v end})
+C1:Input({Title = "血量模板", Placeholder = "{health}/{max}", Value = "{health}/{max}", Callback = function(v) Cfg.CustomHealthTemplate = v end})
+
+Window:Notify({Title = "jentz hub", Content = "ESP 已加载", Duration = 5})
