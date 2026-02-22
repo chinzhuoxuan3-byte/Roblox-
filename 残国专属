@@ -1,0 +1,92 @@
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+local RageEnabled = false
+local TeamCheck = true
+local TargetPart = "Head"
+local FireRate = 0
+local lastFired = 0
+local RadiusOffset = 0.1
+
+local Window = Library:CreateWindow({ Title = "Ragebot Internal", Center = true, AutoShow = true })
+local MainTab = Window:AddTab("Main")
+local RageGroup = MainTab:AddLeftGroupbox("暴力选项")
+
+RageGroup:AddToggle("RageToggle", {
+    Text = "启用 Ragebot",
+    Default = false,
+    Callback = function(Value) RageEnabled = Value end
+})
+
+RageGroup:AddToggle("TeamCheck", {
+    Text = "队伍检测",
+    Default = true,
+    Callback = function(Value) TeamCheck = Value end
+})
+
+RageGroup:AddSlider("FireRate", {
+    Text = "射速 (0为无延迟)",
+    Default = 0,
+    Min = 0,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(Value) FireRate = Value end
+})
+
+local function GetClosestPlayer()
+    local target = nil
+    local dist = math.huge
+    
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild(TargetPart) then
+            local humanoid = v.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                if not TeamCheck or v.Team ~= LocalPlayer.Team then
+                    local mag = (v.Character[TargetPart].Position - LocalPlayer.Character.PrimaryPart.Position).Magnitude
+                    if mag < dist then
+                        dist = mag
+                        target = v.Character[TargetPart]
+                    end
+                end
+            end
+        end
+    end
+    return target
+end
+
+RunService.Heartbeat:Connect(function()
+    if not RageEnabled then return end
+    
+    local now = tick()
+    if now - lastFired < FireRate then return end
+    
+    local targetInstance = GetClosestPlayer()
+    local tool = LocalPlayer.Character and (LocalPlayer.Character:FindFirstChild("No Scope Rifle 2.0") or LocalPlayer.Backpack:FindFirstChild("No Scope Rifle 2.0"))
+    
+    if targetInstance and tool then
+        local remote = tool:FindFirstChild("RemoteEvent")
+        if remote then
+            local targetPos = targetInstance.Position
+            local originOverride = targetPos + Vector3.new(
+                math.random(-RadiusOffset, RadiusOffset),
+                math.random(-RadiusOffset, RadiusOffset),
+                math.random(-RadiusOffset, RadiusOffset)
+            )
+            
+            local args = {
+                targetPos,
+                3000,
+                originOverride 
+            
+            remote:FireServer(unpack(args))
+            lastFired = now
+        end
+    end
+end)
+
+Library:Notify("Ragebot v2 已加载 - 延迟补偿版")
+
