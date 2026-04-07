@@ -1,0 +1,1262 @@
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local lp = Players.LocalPlayer
+
+local combatSystem = ReplicatedStorage:WaitForChild("CombatSystem")
+local combatRemotes = combatSystem:WaitForChild("Remotes")
+local requestHitRemote = combatRemotes:WaitForChild("RequestHit")
+local remoteEventsFolder = ReplicatedStorage:WaitForChild("RemoteEvents")
+local questAcceptRemote = remoteEventsFolder:WaitForChild("QuestAccept")
+local questProgressRemote = remoteEventsFolder:WaitForChild("QuestProgress")
+local questUIUpdateRemote = remoteEventsFolder:WaitForChild("QuestUIUpdate")
+local questCompleteRemote = remoteEventsFolder:WaitForChild("QuestComplete")
+local useItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("UseItem")
+local requestAbilityRemote = ReplicatedStorage:WaitForChild("AbilitySystem"):WaitForChild("Remotes"):WaitForChild("RequestAbility")
+local allocateStatRemote = remoteEventsFolder:WaitForChild("AllocateStat")
+
+local enemiesFolder = workspace:WaitForChild("NPCs")
+local serviceNpcsFolder = workspace:WaitForChild("ServiceNPCs")
+
+local Quest1Thieves = {
+	"Thief1",
+	"Thief2",
+	"Thief3",
+	"Thief4",
+	"Thief5"
+}
+
+local QuestMap = {
+	["Quest1"]  = { npc = "QuestNPC1",  mobType = "Thief",         amount = 5, specificMobs = Quest1Thieves },
+	["Quest2"]  = { npc = "QuestNPC2",  mobType = "ThiefBoss",     amount = 1, specificMobs = nil },
+	["Quest3"]  = { npc = "QuestNPC3",  mobType = "Monkey",        amount = 5, specificMobs = nil },
+	["Quest4"]  = { npc = "QuestNPC4",  mobType = "MonkeyBoss",    amount = 1, specificMobs = nil },
+	["Quest5"]  = { npc = "QuestNPC5",  mobType = "DesertBandit",  amount = 5, specificMobs = nil },
+	["Quest6"]  = { npc = "QuestNPC6",  mobType = "DesertBoss",    amount = 1, specificMobs = nil },
+	["Quest7"]  = { npc = "QuestNPC7",  mobType = "FrostRogue",    amount = 5, specificMobs = nil },
+	["Quest8"]  = { npc = "QuestNPC8",  mobType = "SnowBoss",      amount = 1, specificMobs = nil },
+	["Quest9"]  = { npc = "QuestNPC9",  mobType = "Sorcerer",      amount = 5, specificMobs = nil },
+	["Quest10"] = { npc = "QuestNPC10", mobType = "PandaMiniBoss", amount = 1, specificMobs = nil },
+	["Quest11"] = { npc = "QuestNPC11", mobType = "Hollow",        amount = 5, specificMobs = nil },
+}
+
+local FarmMobs = {
+	{ name = "Thief [Level 15]", mobs = {"Thief1", "Thief2", "Thief3", "Thief4", "Thief5"} },
+	{ name = "ThiefBoss [Level 50]", mobs = {"ThiefBoss"} },
+	{ name = "Monkey [Level 250]", mobs = {"Monkey1", "Monkey2", "Monkey3", "Monkey4", "Monkey5"} },
+	{ name = "MonkeyBoss [Level 500]", mobs = {"MonkeyBoss"} },
+	{ name = "DesertBandit [Level 750]", mobs = {"DesertBandit1", "DesertBandit2", "DesertBandit3", "DesertBandit4", "DesertBandit5"} },
+	{ name = "DesertBoss [Level 1000]", mobs = {"DesertBoss"} },
+	{ name = "FrostRogue [Level 1500]", mobs = {"FrostRogue1", "FrostRogue2", "FrostRogue3", "FrostRogue4", "FrostRogue5"} },
+	{ name = "SnowBoss [Level 2000]", mobs = {"SnowBoss"} },
+	{ name = "Sorcerer [Level 3000]", mobs = {"Sorcerer1", "Sorcerer2", "Sorcerer3", "Sorcerer4", "Sorcerer5"} },
+	{ name = "PandaMiniBoss [Level 5000]", mobs = {"PandaMiniBoss"} },
+	{ name = "Hollow [Level 5500]", mobs = {"Hollow1", "Hollow2", "Hollow3", "Hollow4", "Hollow5"} },
+	{ name = "StrongSorcerer [Level 6000]", mobs = {"StrongSorcerer1", "StrongSorcerer2", "StrongSorcerer3", "StrongSorcerer4", "StrongSorcerer5"} },
+	{ name = "Curse [Level 7000]", mobs = {"Curse1", "Curse2", "Curse3", "Curse4", "Curse5"} },
+	{ name = "Slime [Level 8000]", mobs = {"Slime1", "Slime2", "Slime3", "Slime4", "Slime5"} },
+	{ name = "AcademyTeacher [Level 9000]", mobs = {"AcademyTeacher1", "AcademyTeacher2", "AcademyTeacher3", "AcademyTeacher4", "AcademyTeacher5"} },
+	{ name = "Swordsman [Level 10000]", mobs = {"Swordsman1", "Swordsman2", "Swordsman3", "Swordsman4", "Swordsman5"} },
+}
+
+local BossMobs = {
+	{ name = "Yuji", mobs = {"YujiBoss"} },
+	{ name = "Sukuna", mobs = {"SukunaBoss"} },
+	{ name = "Gojo", mobs = {"GojoBoss"} },
+	{ name = "Yamato", mobs = {"YamatoBoss"} },
+	{ name = "Jinwoo", mobs = {"JinwooBoss"} },
+}
+
+local ShopItems = {
+	{ name = "Kanata [1500 Gold]", type = "Kanata", position = Vector3.new(105.85, 10.04, -261.03) },
+	{ name = "DarkBlade [250K Gold+150 Gems]", type = "DarkBlade", position = Vector3.new(-137.16, 13.23, -1093.29) },
+	{ name = "Observation Haki [250k+300 Gems]", type = "ObservationHaki", position = Vector3.new(-713.71, 12.13, -523.93) },
+}
+
+local ChestTypes = {
+	"Common Chest",
+	"Rare Chest",
+	"Legendary Chest",
+	"Mythic Chest"
+}
+
+local Window = Library:CreateWindow({
+	Title = "Yeskid",
+	Footer = "自动任务",
+	Icon = 95816097006870,
+	NotifySide = "Right",
+	ShowCustomCursor = true,
+})
+
+local Tabs = {
+	Main = Window:AddTab("Main", "user"),
+	["UI Settings"] = Window:AddTab("UI Settings", "settings"),
+}
+
+local MainGroup = Tabs.Main:AddLeftGroupbox("自动任务")
+local FarmGroup = Tabs.Main:AddLeftGroupbox("自动刷怪")
+local BossFarmGroup = Tabs.Main:AddLeftGroupbox("自动刷Boss")
+local ShopGroup = Tabs.Main:AddLeftGroupbox("购买物品")
+local ChestGroup = Tabs.Main:AddRightGroupbox("自动开箱")
+local AbilityGroup = Tabs.Main:AddRightGroupbox("自动技能")
+local StatGroup = Tabs.Main:AddLeftGroupbox("自动点数")
+local EquipGroup = Tabs.Main:AddLeftGroupbox("自动装备")
+
+local Config = {
+	Enabled = false,
+	AttackHeight = 15,
+	SelectedQuest = "Quest1",
+	FarmEnabled = false,
+	SelectedFarmMob = "Thief [Level 15]",
+	SelectedItem = "Kanata [1500 Gold]",
+	ChestEnabled = false,
+	SelectedChest = "Common Chest",
+	ChestSpeed = 0.1,
+	ChestBatch = 1,
+	ChestAmountEnabled = false,
+	ChestAmount = 1,
+	AbilityZEnabled = false,
+	AbilityZCooldown = 1,
+	AbilityXEnabled = false,
+	AbilityXCooldown = 1,
+	AbilityCEnabled = false,
+	AbilityCCooldown = 1,
+	AbilityVEnabled = false,
+	AbilityVCooldown = 1,
+	StatMeleeEnabled = false,
+	StatMeleeSpeed = 0.1,
+	StatMeleeAmountEnabled = false,
+	StatMeleeAmount = 1,
+	StatMeleeBatch = 1,
+	StatDefenseEnabled = false,
+	StatDefenseSpeed = 0.1,
+	StatDefenseAmountEnabled = false,
+	StatDefenseAmount = 1,
+	StatDefenseBatch = 1,
+	StatSwordEnabled = false,
+	StatSwordSpeed = 0.1,
+	StatSwordAmountEnabled = false,
+	StatSwordAmount = 1,
+	StatSwordBatch = 1,
+	StatPowerEnabled = false,
+	StatPowerSpeed = 0.1,
+	StatPowerAmountEnabled = false,
+	StatPowerAmount = 1,
+	StatPowerBatch = 1,
+	BossFarmEnabled = false,
+	SelectedBoss = "Yuji",
+	BossAttackHeight = 15,
+}
+
+local questCompleted = false
+local questKills = 0
+local questRequired = 0
+
+local farmThread = nil
+local autoFarmThread = nil
+local autoChestThread = nil
+local abilityZThread = nil
+local abilityXThread = nil
+local abilityCThread = nil
+local abilityVThread = nil
+local statMeleeThread = nil
+local statDefenseThread = nil
+local statSwordThread = nil
+local statPowerThread = nil
+local bossFarmThread = nil
+local originalPosition = nil
+local slots = {}
+local slotThreads = {}
+
+questProgressRemote.OnClientEvent:Connect(function(data)
+	if not data then
+		questCompleted = true
+		return
+	end
+	local req = data.requirements and data.requirements[1]
+	if not req then return end
+	local prog = tonumber(req.progress or 0)
+	local amt = tonumber(req.amount or 1)
+	questKills = prog
+	questRequired = amt
+	if prog >= amt then
+		questCompleted = true
+	end
+end)
+
+questUIUpdateRemote.OnClientEvent:Connect(function(data)
+	if not data then
+		questCompleted = true
+		return
+	end
+	local req = data.requirements and data.requirements[1]
+	if not req then return end
+	local prog = tonumber(req.progress or 0)
+	local amt = tonumber(req.amount or 1)
+	questKills = prog
+	questRequired = amt
+	if prog >= amt then
+		questCompleted = true
+	end
+end)
+
+questCompleteRemote.OnClientEvent:Connect(function()
+	questCompleted = true
+end)
+
+local function GetHRP()
+	local char = lp.Character
+	return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function SaveOriginalPosition()
+	local hrp = GetHRP()
+	if hrp then originalPosition = hrp.CFrame end
+end
+
+local function TeleportToPosition(cf)
+	local hrp = GetHRP()
+	if hrp and cf then hrp.CFrame = cf end
+end
+
+local function TeleportToNPC(npcObj)
+	local hrp = GetHRP()
+	if not hrp or not npcObj then return end
+	local cf = npcObj:IsA("Model") and npcObj:GetPivot() or npcObj.CFrame
+	hrp.CFrame = cf * CFrame.new(0, 0, -3)
+end
+
+local function FindClosestMob(mobType, specificMobs)
+	local keyword = mobType:lower()
+	local hrp = GetHRP()
+	local closest, closestPrimary = nil, nil
+	local closestDist = math.huge
+
+	for _, v in pairs(enemiesFolder:GetChildren()) do
+		if specificMobs then
+			local isSpecific = false
+			for _, mobName in ipairs(specificMobs) do
+				if v.Name == mobName then isSpecific = true break end
+			end
+			if not isSpecific then continue end
+		else
+			if not string.find(v.Name:lower(), keyword, 1, true) then continue end
+		end
+
+		local hum = v:FindFirstChildOfClass("Humanoid")
+		local primary = v.PrimaryPart or v:FindFirstChild("HumanoidRootPart")
+		if hum and hum.Health > 0 and primary then
+			if hrp then
+				local dist = (primary.Position - hrp.Position).Magnitude
+				if dist < closestDist then
+					closestDist = dist
+					closest = v
+					closestPrimary = primary
+				end
+			else
+				return v, primary
+			end
+		end
+	end
+
+	return closest, closestPrimary
+end
+
+local function FindClosestFarmMob(mobNames)
+	local hrp = GetHRP()
+	local closest, closestPrimary = nil, nil
+	local closestDist = math.huge
+
+	for _, mobName in ipairs(mobNames) do
+		for _, v in pairs(enemiesFolder:GetChildren()) do
+			if string.find(v.Name:lower(), mobName:lower(), 1, true) then
+				local hum = v:FindFirstChildOfClass("Humanoid")
+				local primary = v.PrimaryPart or v:FindFirstChild("HumanoidRootPart")
+				if hum and hum.Health > 0 and primary then
+					if hrp then
+						local dist = (primary.Position - hrp.Position).Magnitude
+						if dist < closestDist then
+							closestDist = dist
+							closest = v
+							closestPrimary = primary
+						end
+					else
+						return v, primary
+					end
+				end
+			end
+		end
+	end
+
+	return closest, closestPrimary
+end
+
+local function AttackMob(mob, primary)
+	local hrp = GetHRP()
+	if not hrp then return end
+	local pos = primary.Position
+	hrp.CFrame = CFrame.lookAt(pos + Vector3.new(0, Config.AttackHeight, 0), pos)
+	hrp.AssemblyLinearVelocity = Vector3.zero
+	requestHitRemote:FireServer(mob)
+end
+
+local function StopFarm()
+	if farmThread then task.cancel(farmThread) farmThread = nil end
+end
+
+local function StopAutoFarm()
+	if autoFarmThread then task.cancel(autoFarmThread) autoFarmThread = nil end
+end
+
+local function StopBossFarm()
+	if bossFarmThread then task.cancel(bossFarmThread) bossFarmThread = nil end
+end
+
+local function StopAutoChest()
+	if autoChestThread then task.cancel(autoChestThread) autoChestThread = nil end
+end
+
+local function StopAutoAbilities()
+	if abilityZThread then task.cancel(abilityZThread) abilityZThread = nil end
+	if abilityXThread then task.cancel(abilityXThread) abilityXThread = nil end
+	if abilityCThread then task.cancel(abilityCThread) abilityCThread = nil end
+	if abilityVThread then task.cancel(abilityVThread) abilityVThread = nil end
+end
+
+local function StopAutoStats()
+	if statMeleeThread then task.cancel(statMeleeThread) statMeleeThread = nil end
+	if statDefenseThread then task.cancel(statDefenseThread) statDefenseThread = nil end
+	if statSwordThread then task.cancel(statSwordThread) statSwordThread = nil end
+	if statPowerThread then task.cancel(statPowerThread) statPowerThread = nil end
+end
+
+local function StartFarm()
+	StopFarm()
+	farmThread = task.spawn(function()
+		while Config.Enabled do
+			local questInfo = QuestMap[Config.SelectedQuest]
+
+			questCompleted = false
+			questKills = 0
+			questRequired = questInfo.amount
+
+			local npcObj = serviceNpcsFolder:FindFirstChild(questInfo.npc)
+			if not npcObj then
+				Library:Notify("未找到NPC: " .. questInfo.npc, 3)
+				task.wait(2)
+				continue
+			end
+
+			TeleportToNPC(npcObj)
+			task.wait(0.5)
+			questAcceptRemote:FireServer(questInfo.npc)
+			task.wait(0.5)
+			Library:Notify(Config.SelectedQuest .. " 已接受!")
+
+			while Config.Enabled do
+				if questCompleted then
+					Library:Notify(Config.SelectedQuest .. " 已完成! 重新接取...")
+					task.wait(1)
+					break
+				end
+
+				local mob, primary = FindClosestMob(questInfo.mobType, questInfo.specificMobs)
+				if mob and primary then
+					AttackMob(mob, primary)
+					RunService.Heartbeat:Wait()
+				else
+					task.wait(0.3)
+				end
+			end
+		end
+	end)
+end
+
+local function StartAutoFarm()
+	StopAutoFarm()
+	autoFarmThread = task.spawn(function()
+		local farmInfo = nil
+		for _, info in ipairs(FarmMobs) do
+			if info.name == Config.SelectedFarmMob then
+				farmInfo = info
+				break
+			end
+		end
+		if not farmInfo then return end
+		while Config.FarmEnabled do
+			local mob, primary = FindClosestFarmMob(farmInfo.mobs)
+			if mob and primary then
+				AttackMob(mob, primary)
+				RunService.Heartbeat:Wait()
+			else
+				task.wait(0.5)
+			end
+		end
+	end)
+end
+
+local function StartBossFarm()
+	StopBossFarm()
+	bossFarmThread = task.spawn(function()
+		local bossInfo = nil
+		for _, info in ipairs(BossMobs) do
+			if info.name == Config.SelectedBoss then
+				bossInfo = info
+				break
+			end
+		end
+		if not bossInfo then return end
+		while Config.BossFarmEnabled do
+			local mob, primary = FindClosestFarmMob(bossInfo.mobs)
+			if mob and primary then
+				local pos = primary.Position
+				local hrp = GetHRP()
+				if hrp then
+					hrp.CFrame = CFrame.lookAt(pos + Vector3.new(0, Config.BossAttackHeight, 0), pos)
+					hrp.AssemblyLinearVelocity = Vector3.zero
+					requestHitRemote:FireServer(mob)
+				end
+				RunService.Heartbeat:Wait()
+			else
+				task.wait(0.5)
+			end
+		end
+	end)
+end
+
+local function StartAutoChest()
+	StopAutoChest()
+	autoChestThread = task.spawn(function()
+		local totalOpened = 0
+		while Config.ChestEnabled do
+			local batchAmount = Config.ChestBatch
+			local args = {"Use", Config.SelectedChest, batchAmount, false}
+			useItemRemote:FireServer(unpack(args))
+			totalOpened = totalOpened + batchAmount
+			if Config.ChestAmountEnabled and totalOpened >= Config.ChestAmount then
+				Config.ChestEnabled = false
+				Library:Notify("已完成开启 " .. Config.ChestAmount .. " 个宝箱", 3)
+				break
+			end
+			task.wait(Config.ChestSpeed)
+		end
+	end)
+end
+
+local function StartAbilityZ()
+	if abilityZThread then task.cancel(abilityZThread) end
+	abilityZThread = task.spawn(function()
+		while Config.AbilityZEnabled do
+			requestAbilityRemote:FireServer(1)
+			task.wait(Config.AbilityZCooldown)
+		end
+	end)
+end
+
+local function StartAbilityX()
+	if abilityXThread then task.cancel(abilityXThread) end
+	abilityXThread = task.spawn(function()
+		while Config.AbilityXEnabled do
+			requestAbilityRemote:FireServer(2)
+			task.wait(Config.AbilityXCooldown)
+		end
+	end)
+end
+
+local function StartAbilityC()
+	if abilityCThread then task.cancel(abilityCThread) end
+	abilityCThread = task.spawn(function()
+		while Config.AbilityCEnabled do
+			requestAbilityRemote:FireServer(3)
+			task.wait(Config.AbilityCCooldown)
+		end
+	end)
+end
+
+local function StartAbilityV()
+	if abilityVThread then task.cancel(abilityVThread) end
+	abilityVThread = task.spawn(function()
+		while Config.AbilityVEnabled do
+			requestAbilityRemote:FireServer(4)
+			task.wait(Config.AbilityVCooldown)
+		end
+	end)
+end
+
+local function StartStatMelee()
+	if statMeleeThread then task.cancel(statMeleeThread) end
+	statMeleeThread = task.spawn(function()
+		local allocated = 0
+		while Config.StatMeleeEnabled do
+			allocateStatRemote:FireServer("Melee", Config.StatMeleeBatch)
+			allocated = allocated + Config.StatMeleeBatch
+			if Config.StatMeleeAmountEnabled and allocated >= Config.StatMeleeAmount then
+				Config.StatMeleeEnabled = false
+				Library:Notify("Melee 点数分配完成", 3)
+				break
+			end
+			task.wait(Config.StatMeleeSpeed)
+		end
+	end)
+end
+
+local function StartStatDefense()
+	if statDefenseThread then task.cancel(statDefenseThread) end
+	statDefenseThread = task.spawn(function()
+		local allocated = 0
+		while Config.StatDefenseEnabled do
+			allocateStatRemote:FireServer("Defense", Config.StatDefenseBatch)
+			allocated = allocated + Config.StatDefenseBatch
+			if Config.StatDefenseAmountEnabled and allocated >= Config.StatDefenseAmount then
+				Config.StatDefenseEnabled = false
+				Library:Notify("Defense 点数分配完成", 3)
+				break
+			end
+			task.wait(Config.StatDefenseSpeed)
+		end
+	end)
+end
+
+local function StartStatSword()
+	if statSwordThread then task.cancel(statSwordThread) end
+	statSwordThread = task.spawn(function()
+		local allocated = 0
+		while Config.StatSwordEnabled do
+			allocateStatRemote:FireServer("Sword", Config.StatSwordBatch)
+			allocated = allocated + Config.StatSwordBatch
+			if Config.StatSwordAmountEnabled and allocated >= Config.StatSwordAmount then
+				Config.StatSwordEnabled = false
+				Library:Notify("Sword 点数分配完成", 3)
+				break
+			end
+			task.wait(Config.StatSwordSpeed)
+		end
+	end)
+end
+
+local function StartStatPower()
+	if statPowerThread then task.cancel(statPowerThread) end
+	statPowerThread = task.spawn(function()
+		local allocated = 0
+		while Config.StatPowerEnabled do
+			allocateStatRemote:FireServer("Power", Config.StatPowerBatch)
+			allocated = allocated + Config.StatPowerBatch
+			if Config.StatPowerAmountEnabled and allocated >= Config.StatPowerAmount then
+				Config.StatPowerEnabled = false
+				Library:Notify("Power 点数分配完成", 3)
+				break
+			end
+			task.wait(Config.StatPowerSpeed)
+		end
+	end)
+end
+
+local function getWeaponList()
+	local weapons = {}
+	local backpack = lp:FindFirstChild("Backpack")
+	if backpack then
+		for _, v in ipairs(backpack:GetChildren()) do
+			if v:IsA("Tool") then
+				table.insert(weapons, v.Name)
+			end
+		end
+	end
+	return weapons
+end
+
+local function getToolByName(name)
+	local backpack = lp:FindFirstChild("Backpack")
+	if not backpack then return nil end
+	for _, v in ipairs(backpack:GetChildren()) do
+		if v:IsA("Tool") and v.Name == name then
+			return v
+		end
+	end
+	return nil
+end
+
+local function equipSlot(slotIndex)
+	local slot = slots[slotIndex]
+	if not slot.enabled then return end
+	
+	local char = lp.Character
+	if not char then return end
+	
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+	
+	local tool = getToolByName(slot.selectedWeapon)
+	if not tool then return end
+	
+	local equipped = char:FindFirstChildOfClass("Tool")
+	if equipped and equipped.Name == tool.Name then
+		return
+	end
+	
+	humanoid:EquipTool(tool)
+end
+
+local function startSlotThread(slotIndex)
+	if slotThreads[slotIndex] then
+		task.cancel(slotThreads[slotIndex])
+	end
+	
+	local slot = slots[slotIndex]
+	if not slot.enabled then return end
+	
+	slotThreads[slotIndex] = task.spawn(function()
+		while slot.enabled do
+			equipSlot(slotIndex)
+			task.wait(slot.interval)
+		end
+	end)
+end
+
+for i = 1, 4 do
+	local slotGroup = EquipGroup:AddLeftGroupbox("Slot " .. i)
+	
+	local toggle = slotGroup:AddToggle("AutoEquipSlot"..i, {
+		Text = "自动装备",
+		Default = false,
+		Callback = function(v)
+			if not slots[i] then
+				slots[i] = {
+					enabled = v,
+					selectedWeapon = "",
+					interval = 0.3,
+				}
+			else
+				slots[i].enabled = v
+			end
+			if v then
+				startSlotThread(i)
+			else
+				if slotThreads[i] then
+					task.cancel(slotThreads[i])
+				end
+			end
+		end
+	})
+	
+	local weaponList = getWeaponList()
+	local dropdown = slotGroup:AddDropdown("WeaponSelectSlot"..i, {
+		Values = weaponList,
+		Default = 1,
+		Multi = false,
+		Text = "选择武器",
+		Callback = function(v)
+			if not slots[i] then
+				slots[i] = {
+					enabled = false,
+					selectedWeapon = v,
+					interval = 0.3,
+				}
+			else
+				slots[i].selectedWeapon = v
+			end
+			if slots[i] and slots[i].enabled then
+				startSlotThread(i)
+			end
+		end
+	})
+	
+	local intervalSlider = slotGroup:AddSlider("EquipIntervalSlot"..i, {
+		Text = "装备间隔(秒)",
+		Default = 0.3,
+		Min = 0.1,
+		Max = 5,
+		Rounding = 1,
+		Callback = function(v)
+			if not slots[i] then
+				slots[i] = {
+					enabled = false,
+					selectedWeapon = "",
+					interval = v,
+				}
+			else
+				slots[i].interval = v
+			end
+			if slots[i] and slots[i].enabled then
+				startSlotThread(i)
+			end
+		end
+	})
+	
+	local refreshButton = slotGroup:AddButton("刷新武器列表", function()
+		local newList = getWeaponList()
+		dropdown:SetValues(newList)
+		if #newList > 0 then
+			if slots[i] and slots[i].selectedWeapon and table.find(newList, slots[i].selectedWeapon) then
+			else
+				if #newList > 0 then
+					dropdown:SetValue(newList[1])
+					if slots[i] then slots[i].selectedWeapon = newList[1] end
+				end
+			end
+			Library:Notify("Slot "..i.." 武器列表已刷新", 2)
+		else
+			Library:Notify("Slot "..i.." 背包无武器", 2)
+		end
+	end)
+	
+	slots[i] = {
+		enabled = false,
+		selectedWeapon = #weaponList > 0 and weaponList[1] or "",
+		interval = 0.3,
+	}
+	if #weaponList > 0 then
+		dropdown:SetValue(slots[i].selectedWeapon)
+	end
+end
+
+lp.CharacterAdded:Connect(function()
+	task.wait(1)
+	for i = 1, 4 do
+		if slots[i] and slots[i].enabled then
+			startSlotThread(i)
+		end
+	end
+end)
+
+local function BuyItem()
+	local hrp = GetHRP()
+	if not hrp then Library:Notify("无法获取角色位置", 3) return end
+	SaveOriginalPosition()
+	local selectedItem = nil
+	for _, item in ipairs(ShopItems) do
+		if item.name == Config.SelectedItem then selectedItem = item break end
+	end
+	if not selectedItem then Library:Notify("未找到物品信息", 3) return end
+	TeleportToPosition(CFrame.new(selectedItem.position))
+	task.wait(0.5)
+	if selectedItem.type == "Kanata" then
+		local katanaNPC = workspace.ServiceNPCs:FindFirstChild("Katana")
+		if katanaNPC then
+			local prompt = katanaNPC.HumanoidRootPart:FindFirstChild("KatanaShopPrompt")
+			if prompt then
+				fireproximityprompt(prompt)
+				Library:Notify("正在购买 " .. Config.SelectedItem, 2)
+				task.wait(1)
+			else
+				Library:Notify("未找到交互提示", 3)
+			end
+		else
+			Library:Notify("未找到Katana NPC", 3)
+		end
+	elseif selectedItem.type == "DarkBlade" then
+		local darkBladeNPC = workspace.ServiceNPCs:FindFirstChild("DarkBladeNPC")
+		if darkBladeNPC then
+			local prompt = darkBladeNPC.HumanoidRootPart:FindFirstChild("DarkBladeShopPrompt")
+			if prompt then
+				fireproximityprompt(prompt)
+				Library:Notify("正在购买 " .. Config.SelectedItem, 2)
+				task.wait(1)
+			else
+				Library:Notify("未找到交互提示", 3)
+			end
+		else
+			Library:Notify("未找到DarkBladeNPC", 3)
+		end
+	elseif selectedItem.type == "ObservationHaki" then
+		local observationNPC = workspace.ServiceNPCs:FindFirstChild("ObservationBuyer")
+		if observationNPC then
+			local prompt = observationNPC.HumanoidRootPart:FindFirstChild("ObservationHakiPrompt")
+			if prompt then
+				fireproximityprompt(prompt)
+				Library:Notify("正在购买 " .. Config.SelectedItem, 2)
+				task.wait(1)
+			else
+				Library:Notify("未找到交互提示", 3)
+			end
+		else
+			Library:Notify("未找到ObservationBuyer NPC", 3)
+		end
+	end
+	if originalPosition then
+		TeleportToPosition(originalPosition)
+		Library:Notify("已返回原位", 2)
+	end
+end
+
+MainGroup:AddToggle("AutoQuestToggle", {
+	Text = "自动任务",
+	Default = false,
+	Callback = function(v)
+		Config.Enabled = v
+		if v then
+			StartFarm()
+			Library:Notify("已开始: " .. Config.SelectedQuest)
+		else
+			StopFarm()
+			Library:Notify("已停止")
+		end
+	end
+})
+
+MainGroup:AddDropdown("QuestSelect", {
+	Values = {"Quest1","Quest2","Quest3","Quest4","Quest5","Quest6","Quest7","Quest8","Quest9","Quest10","Quest11"},
+	Default = 1,
+	Multi = false,
+	Text = "选择任务",
+	Callback = function(v)
+		Config.SelectedQuest = v
+		if Config.Enabled then
+			questCompleted = true
+			StartFarm()
+		end
+	end
+})
+
+MainGroup:AddSlider("AttackHeight", {
+	Text = "攻击高度",
+	Default = 15,
+	Min = 5,
+	Max = 50,
+	Rounding = 0,
+	Callback = function(v) Config.AttackHeight = v end
+})
+
+FarmGroup:AddToggle("AutoFarmToggle", {
+	Text = "自动刷怪",
+	Default = false,
+	Callback = function(v)
+		Config.FarmEnabled = v
+		if v then StartAutoFarm() Library:Notify("已开始刷怪: " .. Config.SelectedFarmMob)
+		else StopAutoFarm() Library:Notify("已停止刷怪") end
+	end
+})
+
+local farmOptions = {}
+for _, info in ipairs(FarmMobs) do table.insert(farmOptions, info.name) end
+
+FarmGroup:AddDropdown("FarmMobSelect", {
+	Values = farmOptions,
+	Default = 1,
+	Multi = false,
+	Text = "选择怪物",
+	Callback = function(v)
+		Config.SelectedFarmMob = v
+		if Config.FarmEnabled then StopAutoFarm() StartAutoFarm() end
+	end
+})
+
+BossFarmGroup:AddToggle("AutoBossFarmToggle", {
+	Text = "自动刷Boss",
+	Default = false,
+	Callback = function(v)
+		Config.BossFarmEnabled = v
+		if v then
+			StartBossFarm()
+			Library:Notify("已开始刷Boss: " .. Config.SelectedBoss)
+		else
+			StopBossFarm()
+			Library:Notify("已停止刷Boss")
+		end
+	end
+})
+
+local bossOptions = {}
+for _, info in ipairs(BossMobs) do
+	table.insert(bossOptions, info.name)
+end
+
+BossFarmGroup:AddDropdown("BossSelect", {
+	Values = bossOptions,
+	Default = 1,
+	Multi = false,
+	Text = "选择Boss",
+	Callback = function(v)
+		Config.SelectedBoss = v
+		if Config.BossFarmEnabled then
+			StopBossFarm()
+			StartBossFarm()
+			Library:Notify("已切换至: " .. v)
+		end
+	end
+})
+
+BossFarmGroup:AddSlider("BossAttackHeight", {
+	Text = "攻击高度",
+	Default = 15,
+	Min = -5,
+	Max = 30,
+	Rounding = 0,
+	Callback = function(v)
+		Config.BossAttackHeight = v
+	end
+})
+
+local shopOptions = {}
+for _, item in ipairs(ShopItems) do table.insert(shopOptions, item.name) end
+
+ShopGroup:AddDropdown("ItemSelect", {
+	Values = shopOptions,
+	Default = 1,
+	Multi = false,
+	Text = "选择物品",
+	Callback = function(v) Config.SelectedItem = v end
+})
+
+ShopGroup:AddButton("购买", function() BuyItem() end)
+
+ChestGroup:AddToggle("AutoChestToggle", {
+	Text = "自动开箱",
+	Default = false,
+	Callback = function(v)
+		Config.ChestEnabled = v
+		if v then StartAutoChest() Library:Notify("已开始开启 " .. Config.SelectedChest)
+		else StopAutoChest() Library:Notify("已停止开箱") end
+	end
+})
+
+ChestGroup:AddDropdown("ChestSelect", {
+	Values = ChestTypes,
+	Default = 1,
+	Multi = false,
+	Text = "选择宝箱",
+	Callback = function(v) Config.SelectedChest = v end
+})
+
+ChestGroup:AddSlider("ChestSpeed", {
+	Text = "开箱速度",
+	Default = 0.1,
+	Min = 0.001,
+	Max = 10,
+	Rounding = 3,
+	Callback = function(v) Config.ChestSpeed = v end
+})
+
+ChestGroup:AddSlider("ChestBatch", {
+	Text = "一次性开箱数量",
+	Default = 1,
+	Min = 1,
+	Max = 100,
+	Rounding = 0,
+	Callback = function(v) Config.ChestBatch = v end
+})
+
+ChestGroup:AddToggle("ChestAmountToggle", {
+	Text = "限制开箱数量",
+	Default = false,
+	Callback = function(v) Config.ChestAmountEnabled = v end
+})
+
+ChestGroup:AddSlider("ChestAmount", {
+	Text = "开箱（多少停止）",
+	Default = 1,
+	Min = 1,
+	Max = 1000,
+	Rounding = 0,
+	Callback = function(v) Config.ChestAmount = v end
+})
+
+AbilityGroup:AddToggle("AbilityZToggle", {
+	Text = "Z技能",
+	Default = false,
+	Callback = function(v)
+		Config.AbilityZEnabled = v
+		if v then StartAbilityZ() else if abilityZThread then task.cancel(abilityZThread) abilityZThread = nil end end
+	end
+})
+
+AbilityGroup:AddSlider("AbilityZCooldown", {
+	Text = "Z技能冷却时间",
+	Default = 1,
+	Min = 1,
+	Max = 30,
+	Rounding = 0,
+	Callback = function(v) Config.AbilityZCooldown = v end
+})
+
+AbilityGroup:AddToggle("AbilityXToggle", {
+	Text = "X技能",
+	Default = false,
+	Callback = function(v)
+		Config.AbilityXEnabled = v
+		if v then StartAbilityX() else if abilityXThread then task.cancel(abilityXThread) abilityXThread = nil end end
+	end
+})
+
+AbilityGroup:AddSlider("AbilityXCooldown", {
+	Text = "X技能冷却时间",
+	Default = 1,
+	Min = 1,
+	Max = 30,
+	Rounding = 0,
+	Callback = function(v) Config.AbilityXCooldown = v end
+})
+
+AbilityGroup:AddToggle("AbilityCToggle", {
+	Text = "C技能",
+	Default = false,
+	Callback = function(v)
+		Config.AbilityCEnabled = v
+		if v then StartAbilityC() else if abilityCThread then task.cancel(abilityCThread) abilityCThread = nil end end
+	end
+})
+
+AbilityGroup:AddSlider("AbilityCCooldown", {
+	Text = "C技能冷却时间",
+	Default = 1,
+	Min = 1,
+	Max = 30,
+	Rounding = 0,
+	Callback = function(v) Config.AbilityCCooldown = v end
+})
+
+AbilityGroup:AddToggle("AbilityVToggle", {
+	Text = "V技能",
+	Default = false,
+	Callback = function(v)
+		Config.AbilityVEnabled = v
+		if v then StartAbilityV() else if abilityVThread then task.cancel(abilityVThread) abilityVThread = nil end end
+	end
+})
+
+AbilityGroup:AddSlider("AbilityVCooldown", {
+	Text = "V技能冷却时间",
+	Default = 1,
+	Min = 1,
+	Max = 30,
+	Rounding = 0,
+	Callback = function(v) Config.AbilityVCooldown = v end
+})
+
+StatGroup:AddToggle("StatMeleeToggle", {
+	Text = "Melee点数",
+	Default = false,
+	Callback = function(v)
+		Config.StatMeleeEnabled = v
+		if v then StartStatMelee() else if statMeleeThread then task.cancel(statMeleeThread) statMeleeThread = nil end end
+	end
+})
+
+StatGroup:AddSlider("StatMeleeSpeed", {
+	Text = "Melee分配速度",
+	Default = 0.1,
+	Min = 0.001,
+	Max = 5,
+	Rounding = 3,
+	Callback = function(v) Config.StatMeleeSpeed = v end
+})
+
+StatGroup:AddSlider("StatMeleeBatch", {
+	Text = "一次性分配点数",
+	Default = 1,
+	Min = 1,
+	Max = 100,
+	Rounding = 0,
+	Callback = function(v) Config.StatMeleeBatch = v end
+})
+
+StatGroup:AddToggle("StatMeleeAmountToggle", {
+	Text = "限制分配次数",
+	Default = false,
+	Callback = function(v) Config.StatMeleeAmountEnabled = v end
+})
+
+StatGroup:AddSlider("StatMeleeAmount", {
+	Text = "升级次数",
+	Default = 1,
+	Min = 1,
+	Max = 1000,
+	Rounding = 0,
+	Callback = function(v) Config.StatMeleeAmount = v end
+})
+
+StatGroup:AddToggle("StatDefenseToggle", {
+	Text = "Defense点数",
+	Default = false,
+	Callback = function(v)
+		Config.StatDefenseEnabled = v
+		if v then StartStatDefense() else if statDefenseThread then task.cancel(statDefenseThread) statDefenseThread = nil end end
+	end
+})
+
+StatGroup:AddSlider("StatDefenseSpeed", {
+	Text = "Defense分配速度",
+	Default = 0.1,
+	Min = 0.001,
+	Max = 5,
+	Rounding = 3,
+	Callback = function(v) Config.StatDefenseSpeed = v end
+})
+
+StatGroup:AddSlider("StatDefenseBatch", {
+	Text = "一次性分配点数",
+	Default = 1,
+	Min = 1,
+	Max = 100,
+	Rounding = 0,
+	Callback = function(v) Config.StatDefenseBatch = v end
+})
+
+StatGroup:AddToggle("StatDefenseAmountToggle", {
+	Text = "限制分配次数",
+	Default = false,
+	Callback = function(v) Config.StatDefenseAmountEnabled = v end
+})
+
+StatGroup:AddSlider("StatDefenseAmount", {
+	Text = "升级次数",
+	Default = 1,
+	Min = 1,
+	Max = 1000,
+	Rounding = 0,
+	Callback = function(v) Config.StatDefenseAmount = v end
+})
+
+StatGroup:AddToggle("StatSwordToggle", {
+	Text = "Sword点数",
+	Default = false,
+	Callback = function(v)
+		Config.StatSwordEnabled = v
+		if v then StartStatSword() else if statSwordThread then task.cancel(statSwordThread) statSwordThread = nil end end
+	end
+})
+
+StatGroup:AddSlider("StatSwordSpeed", {
+	Text = "Sword分配速度",
+	Default = 0.1,
+	Min = 0.001,
+	Max = 5,
+	Rounding = 3,
+	Callback = function(v) Config.StatSwordSpeed = v end
+})
+
+StatGroup:AddSlider("StatSwordBatch", {
+	Text = "一次性分配点数",
+	Default = 1,
+	Min = 1,
+	Max = 100,
+	Rounding = 0,
+	Callback = function(v) Config.StatSwordBatch = v end
+})
+
+StatGroup:AddToggle("StatSwordAmountToggle", {
+	Text = "限制分配次数",
+	Default = false,
+	Callback = function(v) Config.StatSwordAmountEnabled = v end
+})
+
+StatGroup:AddSlider("StatSwordAmount", {
+	Text = "升级次数",
+	Default = 1,
+	Min = 1,
+	Max = 1000,
+	Rounding = 0,
+	Callback = function(v) Config.StatSwordAmount = v end
+})
+
+StatGroup:AddToggle("StatPowerToggle", {
+	Text = "Power点数",
+	Default = false,
+	Callback = function(v)
+		Config.StatPowerEnabled = v
+		if v then StartStatPower() else if statPowerThread then task.cancel(statPowerThread) statPowerThread = nil end end
+	end
+})
+
+StatGroup:AddSlider("StatPowerSpeed", {
+	Text = "Power分配速度",
+	Default = 0.1,
+	Min = 0.001,
+	Max = 5,
+	Rounding = 3,
+	Callback = function(v) Config.StatPowerSpeed = v end
+})
+
+StatGroup:AddSlider("StatPowerBatch", {
+	Text = "一次性分配点数",
+	Default = 1,
+	Min = 1,
+	Max = 100,
+	Rounding = 0,
+	Callback = function(v) Config.StatPowerBatch = v end
+})
+
+StatGroup:AddToggle("StatPowerAmountToggle", {
+	Text = "限制分配次数",
+	Default = false,
+	Callback = function(v) Config.StatPowerAmountEnabled = v end
+})
+
+StatGroup:AddSlider("StatPowerAmount", {
+	Text = "升级次数",
+	Default = 1,
+	Min = 1,
+	Max = 1000,
+	Rounding = 0,
+	Callback = function(v) Config.StatPowerAmount = v end
+})
+
+local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("菜单", "wrench")
+
+MenuGroup:AddLabel("菜单按键")
+	:AddKeyPicker("MenuKeybind", { Default = "RightShift", NoUI = true, Text = "菜单按键" })
+
+MenuGroup:AddButton("卸载", function()
+	Config.Enabled = false
+	Config.FarmEnabled = false
+	Config.BossFarmEnabled = false
+	Config.ChestEnabled = false
+	Config.AbilityZEnabled = false
+	Config.AbilityXEnabled = false
+	Config.AbilityCEnabled = false
+	Config.AbilityVEnabled = false
+	Config.StatMeleeEnabled = false
+	Config.StatDefenseEnabled = false
+	Config.StatSwordEnabled = false
+	Config.StatPowerEnabled = false
+	for i = 1, 4 do
+		if slots[i] then slots[i].enabled = false end
+		if slotThreads[i] then task.cancel(slotThreads[i]) end
+	end
+	StopFarm()
+	StopAutoFarm()
+	StopBossFarm()
+	StopAutoChest()
+	StopAutoAbilities()
+	StopAutoStats()
+	Library:Unload()
+end)
+
+Library.ToggleKeybind = Library.Options.MenuKeybind
+
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:SetLibrary(Library)
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+
+Library:OnUnload(function()
+	Config.Enabled = false
+	Config.FarmEnabled = false
+	Config.BossFarmEnabled = false
+	Config.ChestEnabled = false
+	Config.AbilityZEnabled = false
+	Config.AbilityXEnabled = false
+	Config.AbilityCEnabled = false
+	Config.AbilityVEnabled = false
+	Config.StatMeleeEnabled = false
+	Config.StatDefenseEnabled = false
+	Config.StatSwordEnabled = false
+	Config.StatPowerEnabled = false
+	for i = 1, 4 do
+		if slots[i] then slots[i].enabled = false end
+		if slotThreads[i] then task.cancel(slotThreads[i]) end
+	end
+	StopFarm()
+	StopAutoFarm()
+	StopBossFarm()
+	StopAutoChest()
+	StopAutoAbilities()
+	StopAutoStats()
+end)
